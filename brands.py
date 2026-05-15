@@ -1,5 +1,8 @@
 ## Terrible Python code, go! ##
 
+## TODO and SUGGESTIONS
+## - "i would recommend setting bits and then bit masking for tile properties instead of polynomial coding, cause checking divisibility might be slower "
+
 #### Functions ####
 
 # Rock value: no rock, yes rock, no rock button, yes rock button, hands (hands!)
@@ -846,11 +849,11 @@ brand_dicts = {
 
 # ONLY used for testing.
 known_solutions = {
-    "add+add": ["U","R","U","Z"],
+    "add+add": "URUZ",
     
-    "eus+eus": ["L","Z","R","U","R","D","R","L","L","R","Z","R","Z","L","L","R","Z","R","D","L","Z","D","Z","D","Z","L","D","R"],
-    "eus+lev": ["L","Z","U","R","R","D","L","Z","L","R","Z","D","D","U","U","D","Z","D","D","Z","U","R","U","Z","L","D","U","Z","D","Z","D","L","Z","R","Z","U","L","Z","R","U","Z","D","Z","U","L","R","Z","R","R","Z","L","L","R","Z","R","L","Z","U","D","Z","D","R","Z","L","U","Z","D","D","Z","R","U"],
-    "eus+cif": ["L","Z","R","R","L","Z","D","L","Z","R","R","L","Z","U","U","D","Z","R","U","D","Z","D","Z","U","Z","R","L","Z","D","Z","R","Z","L","Z","D","U","Z","D","Z","D","Z","R","R","U","Z","L","L","U","D","Z","U","Z","U","Z","D","D","L","R","Z","U","U","D","Z","U","Z","U","R","L","D","D","U","Z","D","Z","D","U","Z","D","Z","D","L","Z","R","U","U","Z","D","D","U","Z","D","Z","D","L","R","Z","U","U","Z","D","Z","U","R","L","Z","L","L","R","Z","U","R","Z","R","Z"],
+    "eus+eus": "LZRURDRLLRZRZLLRZRDLZDZDZLDR",
+    "eus+lev": "LZURRDLZLRZDDUUDZDDZURUZLDUZDZDLZRZULZRUZDZULRZRRZLLRZRLZUDZDRZLUZDDZRU",
+    "eus+cif": "LZRRLZDLZRRLZUUDZRUDZDZUZRLZDZRZLZDUZDZDZRRUZLLUDZUZUZDDLRZUUDZUZURLDDUZDZDUZDZDLZRUUZDDUZDZDLRZUUZDZURLZLLRZURZRZ",
     
     "mon+eus": "UUZLDDUZUZLRZRRZLLDZDDDRRZLUULUURLZLZDLDDRDRRRZLZRRUUULZLZDZDZUUULLUDZRRDZULLDLRZRZLDZLURZUDZDUZ",
 }
