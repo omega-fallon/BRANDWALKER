@@ -7,6 +7,12 @@
 # Player value: not present, down, left, up, right
 # Land value: hole, walkable, glass, stairs, wall
 
+stupid_display_crap = False
+try:
+    print("█")
+except:
+    stupid_display_crap = True
+
 ## Prints a brand in a readable way.
 def display_brane(brane):
     if len(brane) != 36:
@@ -14,27 +20,37 @@ def display_brane(brane):
 
     string = ""
     for i in range(36):
+        string_to_add = "X"
+        
         if brane[i] == 0:
-            string += "_"
+            string_to_add = "_"
         elif brane[i] == 1:
-            string += "█"
+            if stupid_display_crap:
+                string_to_add = "#"
+            else:
+                string_to_add = "█"
         elif brane[i] == 2:
-            string += "/"
+            string_to_add = "/"
         elif brane[i] == 3:
-            string += "S"
+            string_to_add = "S"
         elif brane[i] == 4:
-            string += "W"
-        elif get_player_value_from_tile(brane[i]) == 1:
-            string += "V"
+            string_to_add = "W"
+        
+        if get_rock_value_from_tile(brane[i]) == 1 or get_rock_value_from_tile(brane[i]) == 3:
+            string_to_add = "R"
+        elif get_rock_value_from_tile(brane[i]) == 2:
+            string_to_add = "B"
+        
+        if get_player_value_from_tile(brane[i]) == 1:
+            string_to_add = "V"
         elif get_player_value_from_tile(brane[i]) == 2:
-            string += "<"
+            string_to_add = "<"
         elif get_player_value_from_tile(brane[i]) == 3:
-            string += "^"
+            string_to_add = "^"
         elif get_player_value_from_tile(brane[i]) == 4:
-            string += ">"
-        else:
-            string += "X"
+            string_to_add = ">"
 
+        string += string_to_add
         string += " "
 
         if i == 5 or i == 11 or i == 17 or i == 23 or i == 29:
@@ -47,7 +63,7 @@ def create_tile_data(rock, beaver, player, land):
     if player > 4 or land > 4 or player < 0 or land < 0:
         error = input("Error! Invalid inputs in create_tile_data()! " + str(player) + " " + str(land))
 
-    # return (5^2)*beaver + (5^1)*player + (5^0)*land
+    # return (5^3)*rock + (5^2)*beaver + (5^1)*player + (5^0)*land
     return 125 * rock + 25 * beaver + 5 * player + land
 
 ## Given a tile value, extracts the rock value.
@@ -206,7 +222,7 @@ def direction_letter_to_number(letter):
 ## Direction provided can be either integer or letter.
 def index_tile_in_direction_of_player(brane_state, player_direction=-1):
     player_i = get_player_index(brane_state)
-    if player_direction == -1:
+    if player_direction == -1 or player_direction == "X":
         player_direction = get_player_value_from_tile(brane_state[player_i])
 
     if player_direction == 0:
@@ -260,7 +276,7 @@ def opposite_direction_letter(letter):
     else:
         return "X"
 
-## Returns true if there any MOVING monsters in the brane. Because this is used to deterime if turn-wasting is worthwhile, hands (hands!) are not counted.
+## Returns true if there any MOVING monsters in the brane. Because this is used to determine if turn-wasting is worthwhile, hands (hands!) are not counted.
 def here_be_monsters_question(brane_state):
     for i in range(36):
         if get_beaver_value_from_tile(brane_state[i]) != 0:
@@ -283,7 +299,7 @@ def brane_has_stairs_question(brane_state):
     return False
 
 ## Counts brand-valid tiles.
-def count_solids(brane_state):
+def count_valids(brane_state):
     if len(brane_state) != 36:
         error = input("Error! Brane with invalid length: " + str(len(brane_state)))
 
@@ -296,7 +312,7 @@ def count_solids(brane_state):
     return counter
 
 ## Counts state-1 tiles.
-def count_true_solids(brane_state):
+def count_state_1s(brane_state):
     if len(brane_state) != 36:
         error = input("Error! Brane with invalid length: " + str(len(brane_state)))
 
@@ -326,7 +342,7 @@ def held_valids():
             counter += 1
     return counter
     
-## Gives a value representing the "distance" between a brane state and the solution.
+## Gives a value representing the "distance" between a brane state and the solution. This is calculated as the number of mismatched tiles, NOT distance in a state-space way. What, do you think I'm competent at coding or something?
 def distance_from_heaven(brane_state, brand):
     distance = 0
     
@@ -352,9 +368,13 @@ def taxicab_distance(a,b):
     
     return abs(x1 - x2) + abs(y1 - y2)
     
-## Returns True if the tile is undesireable (or impossible) to move into. Take a land value.
+## Returns True if player is floating.
+def floating(brand_state):
+    return get_land_value_from_tile(brand_state[get_player_index]) == 0
+    
+## Returns True if the tile is undesirable (or impossible) to move into. Take a land value.
 def land_undesirable(land, brane_state):
-    return land == 0 or land == 4 or (land == 3 and stairs_exitable_question(brane_state))
+    return (land == 0 and wings and floating(brane_state)) or (land == 0 and not wings) or land == 4 or (land == 3 and stairs_exitable_question(brane_state))
     
 ## Given the state and an input, returns the predicted change in "solution distance" if the player were to take that action.
 ## Positive change indicates increasing distance, while negative represents lowering the distance. Thus, here, negative is desirable.
@@ -418,6 +438,39 @@ def predicted_distance_change(brane_state, input_letter):
         # Fractional weights for moving closer to the stairs.
         if brane_has_stairs_question(brane_state):
             total += (taxicab_distance(index_tile_in_direction_of_player(brane_state),get_stairs_index(brane_state)) - taxicab_distance(get_player_index(brane_state),get_stairs_index(brane_state))) / 3
+            
+    # What is the average distance from Heaven among all prior iterations beginning here?
+    total_distance = 0
+    paths_matched = 0
+    
+    for path in previous_loops_distance_dictionary:
+        # See if the path is long enough to compare in the first place.
+        if not (len(path) >= len(working_moves)+1):
+            continue
+        
+        # See if the paths matches.
+        flag = False
+        for i in range(len(working_moves)):
+            if path[i] == working_moves[i]:
+                continue
+            flag = True
+            break
+            
+        if flag:
+            continue
+            
+        # See if the path also matches our new potential move.
+        if path[len(working_moves)+1] != input_letter:
+            continue
+            
+        # Match found!
+        paths_matched += 1
+        total_distance += previous_loops_distance_dictionary[str(path)]
+        
+    # Average and add as factor.
+    if paths_matched > 0:
+        scaling_factor = 5
+        total += (total_distance/paths_matched)/scaling_factor
     
     # Failsafe: distance is 0.
     return total
@@ -437,7 +490,7 @@ def threshold_from_choice(current_brane_layout,choice):
         
     return threshold
     
-## Given an i value for a brane array and movements on the x and y axis, returns a new i index cooresponding to that movement.
+## Given an i value for a brane array and movements on the x and y axis, returns a new i index corresponding to that movement.
 def move_cartesian(i, x, y):
     store = i + x + 6*y
     
@@ -494,13 +547,13 @@ def safe_choice_list(brane_state, stupid_flaggot = False):
         choices.remove("R")
         
     ## Breaking a piece of glass that brings total carve-valid tiles below the brand's amount.
-    if "D" in choices and down_tile_land_value == 2 and count_solids(brane_state)+held_valids() == count_solids(brand_dicts[chosen_brand]):
+    if "D" in choices and down_tile_land_value == 2 and count_valids(brane_state)+held_valids() == count_valids(brand_dicts[chosen_brand]):
         choices.remove("D")
-    if "L" in choices and left_tile_land_value == 2 and count_solids(brane_state)+held_valids() == count_solids(brand_dicts[chosen_brand]):
+    if "L" in choices and left_tile_land_value == 2 and count_valids(brane_state)+held_valids() == count_valids(brand_dicts[chosen_brand]):
         choices.remove("L")
-    if "U" in choices and up_tile_land_value == 2 and count_solids(brane_state)+held_valids() == count_solids(brand_dicts[chosen_brand]):
+    if "U" in choices and up_tile_land_value == 2 and count_valids(brane_state)+held_valids() == count_valids(brand_dicts[chosen_brand]):
         choices.remove("U")
-    if "R" in choices and right_tile_land_value == 2 and count_solids(brane_state)+held_valids() == count_solids(brand_dicts[chosen_brand]):
+    if "R" in choices and right_tile_land_value == 2 and count_valids(brane_state)+held_valids() == count_valids(brand_dicts[chosen_brand]):
         choices.remove("R")
 
     ## Dumb but not deadly ##
@@ -573,7 +626,7 @@ def safe_choice_list(brane_state, stupid_flaggot = False):
         # Double z's are never useful without monsters
         if len(working_moves) > 0 and working_moves[-1] == "Z":
             choices.remove("Z")
-        # Trapping yourself is never worth it. (The "final stairs" case is overriden in a later block, disregard.)
+        # Trapping yourself is never worth it. (The "final stairs" case is overridden in a later block, disregard.)
         elif not wings and void_rod_can_take() and faced_tile_land_value != 0 and brane_has_stairs_question(brane_state) and int(land_undesirable(down_tile_land_value,brane_state))+int(land_undesirable(down_tile_land_value,brane_state))+int(land_undesirable(down_tile_land_value,brane_state))+int(land_undesirable(down_tile_land_value,brane_state)) == 3:
             choices.remove("Z")
     
@@ -606,13 +659,13 @@ def safe_choice_list(brane_state, stupid_flaggot = False):
     
     stupid_horse.sort()
     
-    ## Finder debug ##
-    if not stupid_flaggot and finder_debug:
+    ## PREDESTINATION MODE ##
+    if not stupid_flaggot and predestination_mode:
         predestined_choice = known_solutions[chosen_brane+"+"+chosen_brand][len(working_moves)]
         
         if predestined_choice not in choices:
             print("Choices would've been: "+str(stupid_horse))
-            error = input("Predestined choice was removed by choices algorith. Something needs to be changed.")
+            error = input("Predestined choice was removed by choices algorithm. Something needs to be changed.")
         
         print("Choices would've been: "+str(stupid_horse))
         
@@ -771,6 +824,9 @@ known_solutions = {
     
     "eus+eus": ["L","Z","R","U","R","D","R","L","L","R","Z","R","Z","L","L","R","Z","R","D","L","Z","D","Z","D","Z","L","D","R"],
     "eus+lev": ["L","Z","U","R","R","D","L","Z","L","R","Z","D","D","U","U","D","Z","D","D","Z","U","R","U","Z","L","D","U","Z","D","Z","D","L","Z","R","Z","U","L","Z","R","U","Z","D","Z","U","L","R","Z","R","R","Z","L","L","R","Z","R","L","Z","U","D","Z","D","R","Z","L","U","Z","D","D","Z","R","U"],
+    "eus+cif": ["L","Z","R","R","L","Z","D","L","Z","R","R","L","Z","U","U","D","Z","R","U","D","Z","D","Z","U","Z","R","L","Z","D","Z","R","Z","L","Z","D","U","Z","D","Z","D","Z","R","R","U","Z","L","L","U","D","Z","U","Z","U","Z","D","D","L","R","Z","U","U","D","Z","U","Z","U","R","L","D","D","U","Z","D","Z","D","U","Z","D","Z","D","L","Z","R","U","U","Z","D","D","U","Z","D","Z","D","L","R","Z","U","U","Z","D","Z","U","R","L","Z","L","L","R","Z","U","R","Z","R","Z"],
+    
+    "mon+eus": "UUZLDDUZUZLRZRRZLLDZDDDRRZLUULUURLZLZDLDDRDRRRZLZRRUUULZLZDZDZUUULLUDZRRDZULLDLRZRZLDZLURZUDZDUZ",
 }
 
 ## ## ## ## ## ##
@@ -788,24 +844,27 @@ sword = False
 endless = False
 
 debug_deaths = False
-finder_debug = True
+predestination_mode = False
 
 while True:
     print("\n")
-    if finder_debug:
-        print("CURRENTLY IN FINDER DEBUG MODE!!!")
+    if predestination_mode:
+        print("CURRENTLY IN PREDESTINATION MODE!!!")
     print("WINGS: "+str(wings)+"\n"+"SWORD: "+str(sword)+"\n"+"ENDLESS: "+str(endless))
     
     chosen_brane = input("Starting brane?\n")
     chosen_brand = input("...And the brand?\n")
+    
+    chosen_brane = chosen_brane.lower()
+    chosen_brand = chosen_brand.lower()
 
     if chosen_brane not in brane_dicts or chosen_brand not in brand_dicts:
         print("Invalid inputs. Try again.")
         continue
-    elif count_solids(brand_dicts[chosen_brand]) > count_solids(brane_dicts[chosen_brane]):
+    elif count_valids(brand_dicts[chosen_brand]) > count_valids(brane_dicts[chosen_brane]):
         print("Target brand has more tiles than the selected brane does. This will never work!")
         continue
-    elif not endless and count_solids(brand_dicts[chosen_brand]) < count_true_solids(brane_dicts[chosen_brane]):
+    elif not endless and count_valids(brand_dicts[chosen_brand]) < count_state_1s(brane_dicts[chosen_brane]):
         print("Target brand has less tiles than the selected brane does, we do not have the endless void rod, and there are not enough glass tiles to compensate. This will never work!")
         continue
     elif chosen_brand == "dis" and not brane_has_glass_question(brane_dicts[chosen_brane]):
@@ -822,17 +881,18 @@ while True:
         continue
     
     # Resets this as irrelevant.
-    if finder_debug and not (chosen_brane+"+"+chosen_brand in known_solutions):
-        print("Brane/brand combination not in solution list, disabling finder debug mode.")
-        finder_debug = False
+    if predestination_mode and not (chosen_brane+"+"+chosen_brand in known_solutions):
+        print("Brane/brand combination not in solution list, disabling predestination mode.")
+        predestination_mode = False
     
     working_moves = []
     previous_loops_working_moves = []
-    
     bad_solutions = []
     
-    finder_debug_thresholds = []
-    finder_debug_chances = []
+    previous_loops_distance_dictionary = {}
+    
+    move_thresholds = []
+    move_chances = []
     
     solution_loop_counter = 0
     while True:
@@ -845,7 +905,11 @@ while True:
             if working_moves == previous_loops_working_moves:
                 print("Solution finder has generated the exact same (wrong) sequence of inputs twice in a row. This nearly-certainly implies a bug.")
 
-        previous_loops_working_moves = working_moves
+            previous_loops_working_moves = working_moves
+        
+        if solution_loop_counter > 1:
+            previous_loops_distance_dictionary[str(working_moves)] = distance_from_heaven(current_brane_layout,brand_dicts[chosen_brand])
+        
         working_moves = []
         
         held_tile = []
@@ -861,6 +925,7 @@ while True:
         death_flag = False
         while True:
             moving_loops += 1
+            
             if not endless and len(held_tile) > 1:
                 error = input("Endless Void Rod is not enabled but length of held_tile array is > 1.")
             
@@ -870,17 +935,17 @@ while True:
             
             print("Current moves: " + str(working_moves) + " while holding " + str(held_tile))
             print(display_brane(current_brane_layout))
-            print(count_solids(current_brane_layout))
+            print(count_valids(current_brane_layout))
             
             ## Special failure states
             # Glass can't be broken...
-            if count_solids(current_brane_layout)+held_valids() == count_solids(brand_dicts[chosen_brand]):
+            if count_valids(current_brane_layout)+held_valids() == count_valids(brand_dicts[chosen_brand]):
                 # The brand isn't carved...
                 if not is_brand_carved(current_brane_layout,brand_dicts[chosen_brane]):
                     # No wings...
                     if not wings:
                         # Not holding a solid tile...
-                        if not (1 in held_tile) and not (not stairs_exitable_question() and (2 in held_tile)):
+                        if not (1 in held_tile) and not (not stairs_exitable_question(current_brane_layout) and (2 in held_tile)):
                             # There exists no 3-line for the player to traverse with.
                             if not three_line_present_strict(current_brane_layout):
                                 print("Unrecoverable situation: no 3 line and glass can't be broken.")
@@ -897,8 +962,8 @@ while True:
                         print("Error! Trimming same sequence thrice in a row, likely infinite loop!")
                         death_flag = True
                         break
-                    if finder_debug:
-                        error = input("Trimming occured in predestined choices.")
+                    if predestination_mode:
+                        error = input("Trimming occurred in predestined choices.")
                     
                     last_trimmed = moving_loops
                     trimmings.append([working_moves[-4],working_moves[-3],working_moves[-2],working_moves[-1]])
@@ -913,8 +978,8 @@ while True:
                         print("Error! Trimming same sequence thrice in a row, likely infinite loop!")
                         death_flag = True
                         break
-                    if finder_debug:
-                        error = input("Trimming occured in predestined choices.")
+                    if predestination_mode:
+                        error = input("Trimming occurred in predestined choices.")
                     
                     last_trimmed = moving_loops
                     trimmings.append([working_moves[-2],working_moves[-1]])
@@ -943,8 +1008,8 @@ while True:
                             print("Error! Trimming same sequence thrice in a row, likely infinite loop!")
                             death_flag = True
                             break
-                        if finder_debug:
-                            error = input("Trimming occured in predestined choices.")
+                        if predestination_mode:
+                            error = input("Trimming occurred in predestined choices.")
                             
                         last_trimmed = moving_loops
                         trimmings.append([working_moves[-4],working_moves[-3],working_moves[-2],working_moves[-1]])
@@ -965,15 +1030,15 @@ while True:
                 death_flag = True
                 too_long = True
                 break
-            elif count_solids(brand_dicts[chosen_brand]) > count_solids(current_brane_layout)+held_valids():
+            elif count_valids(brand_dicts[chosen_brand]) > count_valids(current_brane_layout)+held_valids():
                 print("Target brand has more tiles than the current brane state. This will never work!")
                 death_flag = True
                 break
 
             # Every so often, perform a sanity check to make sure something hasn't gone totally wrong.
             if (not brane_has_glass_question(brane_dicts[chosen_brane]) and len(working_moves) % 1 == 0):
-                default_solids = count_solids(brane_dicts[chosen_brane])
-                current_solids = count_solids(current_brane_layout)
+                default_solids = count_valids(brane_dicts[chosen_brane])
+                current_solids = count_valids(current_brane_layout)
 
                 if default_solids != current_solids + held_valids():
                     print("Sanity check fucking failed!!")
@@ -1015,7 +1080,7 @@ while True:
                     
                     if random.random() > threshold:
                         # Calculate chance of this specific choice being made out of all the others.
-                        if finder_debug:
+                        if True:
                             # Modified the safe_choices to use a sorted list instead of a set so we can know the order they come in, making the math more feasible to make accurate.
                             # Add the odds of it happening first loop plus the odds of it happening second loop etc. etc. until gains are negligible.
                             
@@ -1056,8 +1121,8 @@ while True:
                             if len(non_predestined) == 1 and odds < 0.98:
                                 error = input("Only one choice, but odds is reporting less than 100% chance. Something is wrong. "+str(odds))
                             
-                            finder_debug_thresholds.append(round(threshold,3))
-                            finder_debug_chances.append(round(odds,6))
+                            move_thresholds.append(round(threshold,3))
+                            move_chances.append(round(odds,6))
                         
                         current_move = choice
                         break
@@ -1160,13 +1225,16 @@ while True:
     # We succeeded! Print the result and hang.
     print(display_brane(current_brane_layout))
     print(working_moves)
-    if finder_debug:
-        print("Threshold (weight) for each move (higher means lower odds): "+str(finder_debug_thresholds))
-        print("Approximate chances each move would've had in regular mode: "+str(finder_debug_chances))
+    if len(move_thresholds) != 0 and len(move_chances) != 0:
+        print("Threshold (weight) for each move (higher means lower odds): "+str(move_thresholds))
+        if predestination_mode:
+            print("Approximate chances each move would've had in regular mode: "+str(move_chances))
+        else:
+            print("Approximate chances each move had: "+str(move_chances))
         
         mult_chance = 1
         
-        for chance in finder_debug_chances:
+        for chance in move_chances:
             mult_chance *= chance
         
         print("Multiplicative chance: "+str(mult_chance))
@@ -1195,5 +1263,5 @@ while True:
             print("Oh my godddd like, the chance of succeeding is so small the floating point math rounds it down to zero lolz. So embarrassing.")
         else:
             print("It would take "+str(j)+" iterations for there to be a >"+str(p)+"% chance of finding the solution.")
-            print("If each solution-length attempt took 0.1 second, this would in priniple take "+str((j*0.1)/60)+" minutes to find.")
+            print("If each solution-length attempt took 0.1 second, this would in principle take "+str((j*0.1)/60)+" minutes to find.")
     blargh = input("Success! Found this route for " + chosen_brane + " brane carving " + chosen_brand)
