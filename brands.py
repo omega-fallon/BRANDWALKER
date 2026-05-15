@@ -262,6 +262,16 @@ def tile_in_direction_of_player(brane_state: list[int], forced_direction=-1):
     else:
         return brane_state[i]
 
+## Land value convenience functions
+def get_down_tile_land_value(brane_state: list[int]):
+    return get_land_value_from_tile(tile_in_direction_of_player(brane_state,"D"))
+def get_left_tile_land_value(brane_state: list[int]):
+    return get_land_value_from_tile(tile_in_direction_of_player(brane_state,"L"))
+def get_up_tile_land_value(brane_state: list[int]):
+    return get_land_value_from_tile(tile_in_direction_of_player(brane_state,"U"))
+def get_right_tile_land_value(brane_state: list[int]):
+    return get_land_value_from_tile(tile_in_direction_of_player(brane_state,"R"))
+
 ## Returns true if the void rod can take a file.
 def void_rod_can_take():
     return len(held_tiles) == 0 or endless
@@ -386,8 +396,8 @@ def taxicab_distance(a: int, b: int):
     return abs(x1 - x2) + abs(y1 - y2)
     
 ## Returns True if player is floating.
-def floating(brand_state: list[int]):
-    return get_land_value_from_tile(brand_state[get_player_index]) == 0
+def floating(brane_state: list[int]):
+    return get_land_value_from_tile(brane_state[get_player_index(brane_state)]) == 0
     
 ## Returns True if the tile is undesirable (or impossible) to move into. Takes a land value.
 def land_undesirable(land: int, brane_state: list[int]):
@@ -468,29 +478,24 @@ def predicted_distance_change(brane_state: list[int], input_letter: str):
     total_distance = 0
     paths_matched = 0
     
-    for walked_path in failed_loops_distance:
-        # See if the path is long enough to compare in the first place.
-        if not (len(walked_path) >= len(working_moves)+1):
+    for i in range(len(bad_solutions)):
+        walked_path : str = bad_solutions[i]
+        
+        # Check if we'd go out of bounds.
+        a : str = working_moves + input_letter
+        if len(a) > len(walked_path):
             continue
         
-        # See if the paths matches.
+        # See if the paths match.
         flag = False
-        for i in range(len(working_moves)):
-            if walked_path[i] == working_moves[i]:
-                continue
+        for i2 in range(len(a)):
+            if a[i2] != walked_path[i2]:
+                break
             flag = True
-            break
-            
-        if flag:
-            continue
-            
-        # See if the path also matches our new potential move.
-        if walked_path[len(working_moves)] != input_letter:
-            continue
             
         # Match found!
         paths_matched += 1
-        total_distance += failed_loops_distance[array_stringify(walked_path)]
+        total_distance += bad_solutions_distance[i]
         
         # Slight tilt, increase perceived distance if the path is short. (Died.)
         total_distance += min(20,(20 - len(walked_path)))
@@ -584,7 +589,7 @@ def safe_choice_list(brane_state: list[int], stupid_flaggot: bool = False):
         choices.remove("U")
     if "R" in choices and right_tile_land_value == 2 and count_valids(brane_state)+held_valids() == count_valids(brand_dicts[chosen_brand]):
         choices.remove("R")
-
+        
     ## Dumb but not deadly ##
     ## There is no tile in front of the player and the player does not have any tile stored. There is no point in pressing "Z"
     if faced_tile_land_value == 0 and len(held_tiles) == 0:
@@ -661,7 +666,7 @@ def safe_choice_list(brane_state: list[int], stupid_flaggot: bool = False):
     
     ## Historically bad choices ##
     for choice in {"D","L","U","R","Z"}:
-        if (working_moves + choice) in failed_loops_distance and choice in choices:
+        if (working_moves + choice) in bad_solutions and choice in choices:
             choices.remove(choice)
             
     ## Obviously correct choices ##
@@ -878,13 +883,14 @@ predestination_mode = True
 
 # Define here, clear when applicable.
 bad_solutions = []
+bad_solutions_distance = []
 current_brane_layout = []
 held_tiles = []
 last_trimmed = -1
 move_chances = []
 move_thresholds = []
 moving_loops = 0
-failed_loops_distance = {}
+#failed_loops_distance = {}
 steps_since_last_glass = 0
 trimmings = []
 working_moves = ""
@@ -935,6 +941,7 @@ while True:
     solution_loop_counter = 0
     working_moves = ""
     bad_solutions.clear()
+    bad_solutions_distance.clear()
     while True:
         # Iteration
         solution_loop_counter += 1
@@ -946,17 +953,18 @@ while True:
         move_chances.clear()
         move_thresholds.clear()
         moving_loops = 0
-        failed_loops_distance.clear()
+        #failed_loops_distance.clear()
         steps_since_last_glass = 0
         trimmings.clear()
         
         if working_moves != "":
             if len(bad_solutions) > 0 and working_moves == bad_solutions[-1]:
                 print("Solution finder has generated the exact same (wrong) sequence of inputs twice in a row. This nearly-certainly implies a bug.")
-            bad_solutions.append(working_moves+"")
+            bad_solutions.append(working_moves)
+            bad_solutions_distance.append(distance_from_heaven(current_brane_layout,brand_dicts[chosen_brand]))
             
             # I SPENT 1 AND A HALF HOURS TRYING TO FIGURE OUT WHY ASSIGNMENTS WEREN'T WORKING BECAUSE APPARENTLY WHEN YOU ASSIGN THE VARIABLE AS THE KEY, CHANGING THE VARIABLE CHANGES THE KEY AND ASSIGNING AGAIN JUST OVERRIDES WHAT WAS THERE INSTEAD OF JUST LOGGING IT AS THE NEW VALUE. I HATE DATA DICTIONARIES IN PYTHON. HATE. HATE. HATE. LET ME TE
-            failed_loops_distance[bad_solutions[-1]] = distance_from_heaven(current_brane_layout,brand_dicts[chosen_brand])
+            #failed_loops_distance[bad_solutions[-1]] = distance_from_heaven(current_brane_layout,brand_dicts[chosen_brand])
             
         working_moves = ""
         current_brane_layout.clear()
@@ -995,6 +1003,21 @@ while True:
                                 # There exists no 3-line for the player to traverse with.
                                 if not three_line_present_strict(brane_state):
                                     print("Unrecoverable situation: no 3 line and glass can't be broken.")
+                                    return True
+                
+                # Cornered
+                # Not floating...
+                if not floating(brane_state):
+                    # Surrounded, surrounded, surrounded, surrounded.
+                    if get_down_tile_land_value(brane_state) == 0 or get_down_tile_land_value(brane_state) == 4:
+                        if get_left_tile_land_value(brane_state) == 0 or get_left_tile_land_value(brane_state) == 4:
+                            if get_up_tile_land_value(brane_state) == 0 or get_up_tile_land_value(brane_state) == 4:
+                                if get_right_tile_land_value(brane_state) == 0 or get_right_tile_land_value(brane_state) == 4:
+                                    # Facing the corner or facing a pit without anything to place.
+                                    faced_tile_land_value = get_land_value_from_tile(tile_in_direction_of_player(brane_state))
+                                    if faced_tile_land_value == 4 or (faced_tile_land_value == 0 and len(held_tiles) == 0):
+                                        return True
+
             
             if special_failure_states(current_brane_layout):
                 death_flag = True
@@ -1308,9 +1331,11 @@ while True:
             print("If each solution-length attempt took 0.1 second, this would in principle take "+str((j*0.1)/60)+" minutes to find.")
     if soft_predestination and not past_learning_bs_flag:
         print(bad_solutions)
-        print(failed_loops_distance)
-        if solution_loop_counter != len(failed_loops_distance):
-            print("Looped more times than failed_loops_distance entries. Bug!")
+        print(bad_solutions_distance)
+        if len(bad_solutions) != len(bad_solutions_distance):
+            print("Bad solutions arrays are desynced. It sure would be nice if Python let me use a fucking dictionary for this.")
+        if solution_loop_counter-1 != len(bad_solutions):
+            print("Looped more times than bad_solutions entries. Bug!")
         
         print("Soft predestination warning: the past_learning_bs_flag was never triggered, meaning past learning has no effect on the thresholds displayed here.")
     blargh = input("Success! Found this route for " + chosen_brane + " brane carving " + chosen_brand)
