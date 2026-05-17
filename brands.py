@@ -2,6 +2,8 @@
 
 ## TODO and SUGGESTIONS
 ## - "i would recommend setting bits and then bit masking for tile properties instead of polynomial coding, cause checking divisibility might be slower "
+
+## DONE
 ## ADD A CACHE FOR FOUND BAD SOLUTIONS
 
 #### Functions ####
@@ -1115,7 +1117,7 @@ while True:
     
     flag = False
     for i in range(36):
-        if brane_dicts[chosen_brane][i] == wall_value and brand_dicts[chosen_brand][i] == void_value:
+        if brane_dicts[chosen_brane][i] == wall_value and brand_dicts[chosen_brand][i] == pit_value:
             flag = True
             break
     if flag:
@@ -1146,9 +1148,15 @@ while True:
             else:
                 for i in range(len(lines)):
                     if i % 2 == 0:
-                        bad_solutions.append(lines[i].strip())
+                        if combo_name() in known_solutions and lines[i].strip() == known_solutions[combo_name()]:
+                            pass
+                        else:
+                            bad_solutions.append(lines[i].strip())
                     else:
-                        bad_solutions_distance.append(int(lines[i].strip()))
+                        if combo_name() in known_solutions and lines[i-1].strip() == known_solutions[combo_name()]:
+                            pass
+                        else:
+                            bad_solutions_distance.append(int(lines[i].strip()))
     except FileNotFoundError:
         print("No cache found.")
     
@@ -1482,212 +1490,7 @@ while True:
             working_moves += current_move
 
             ## Update the brane state.
-            if current_move == "Z":
-                full_faced_tile_data = tile_in_direction_of_player(current_brane_layout)
-                faced_land_data = get_land_value_from_tile(full_faced_tile_data)
-                
-                # Is tile invalid for both pickup and placedown?
-                if full_faced_tile_data != faced_land_data or faced_land_data == wall_value: # (Explanation: this inequality means there is an entity on the tile, meaning an enemy or a rock. The second one is just checking if the tile is a wall, which is self-explanatory.) 
-                    if safe_choices == ["Z"]:
-                        print("Only valid move is Z but Z does nothing. Resetting...")
-                        death_flag = True
-                        break
-                    
-                    working_moves = working_moves[:-1]
-                # Tile is valid for pickup.
-                elif faced_land_data != pit_value and faced_land_data != wall_value and void_rod_can_take():
-                    steps_since_last_bump += 1
-                    
-                    # Put tile on void rod.
-                    held_tiles.append(faced_land_data)
-
-                    # Remove the tile from the world.
-                    current_brane_layout[index_tile_in_direction_of_player(current_brane_layout)] = 0
-                # Placing tile.
-                elif full_faced_tile_data == pit_value and len(held_tiles) > 0:
-                    steps_since_last_bump += 1
-                    
-                    # Place the tile into the world.
-                    current_brane_layout[index_tile_in_direction_of_player(current_brane_layout)] = held_tiles[-1]
-
-                    # Remove the tile from the void rod.
-                    held_tiles.pop()
-                # Cannot do anything.
-                else:
-                    if safe_choices == ["Z"]:
-                        print("Only valid move is Z but Z does nothing. Resetting...")
-                        death_flag = True
-                        break
-                    
-                    working_moves = working_moves[:-1]
-            elif (current_move == "D" or current_move == "L" or current_move == "U" or current_move == "R"):
-                moving_tile_index = index_tile_in_direction_of_player(current_brane_layout, direction_letter_to_number(current_move))
-
-                if moving_tile_index == -1:
-                    full_moving_tile_data = wall_value
-                    moving_land_data = wall_value
-                else:
-                    full_moving_tile_data = tile_in_direction_of_player(current_brane_layout, direction_letter_to_number(current_move))
-                    moving_land_data = get_land_value_from_tile(full_moving_tile_data)
-
-                # Moving into a hand (hands!)
-                if get_rock_value_from_tile(full_moving_tile_data) == hands_present_value:
-                    print("Error! Death by hand?? Hands?!!")
-                    death_flag = True
-                    break
-                # Moving into a rock.
-                elif get_rock_value_from_tile(full_moving_tile_data) == rock_present_value:
-                    steps_since_last_bump = 0
-                    
-                    # Determine tile the rock is moving into.
-                    rock_destination_index = -1
-                    rock_destination_tile_value = 0
-                    if current_move == "D":
-                        rock_destination_index = move_cartesian(player_index,0,2)
-                        rock_destination_tile_value = tile_at_moved_cartesian(player_index,current_brane_layout,0,2)
-                    elif current_move == "L":
-                        rock_destination_index = move_cartesian(player_index,-2,0)
-                        rock_destination_tile_value = tile_at_moved_cartesian(player_index,current_brane_layout,-2,0)
-                    elif current_move == "U":
-                        rock_destination_index = move_cartesian(player_index,0,-2)
-                        rock_destination_tile_value = tile_at_moved_cartesian(player_index,current_brane_layout,0,-2)
-                    elif current_move == "R":
-                        rock_destination_index = move_cartesian(player_index,2,0)
-                        rock_destination_tile_value = tile_at_moved_cartesian(player_index,current_brane_layout,2,0)
-                    
-                    rock_destination_land_value = get_land_value_from_tile(rock_destination_tile_value)
-                    rock_destination_rock_value = get_rock_value_from_tile(rock_destination_tile_value)
-                    
-                    # Player does a push.
-                    if floating(current_brane_layout):
-                        print("Error! Death by wing pushing??")
-                        death_flag = True
-                        break
-                    else:
-                        current_brane_layout[player_index] = create_tile_data(1, direction_letter_to_number(current_move), player_land_data)
-                    
-                    # If this is a wall or another rock, it can't move.
-                    if rock_destination_land_value == wall_value or rock_destination_rock_value == rock_present_value:
-                        pass
-                    # Otherwise, the rock can move.
-                    else:
-                        # Moved from glass
-                        if moving_land_data == glass_value:
-                            if moving_tile_index == -1:
-                                error = input("1moving_tile_index == -1 and was attempted to be used as an index")
-                            current_brane_layout[moving_tile_index] = 0
-                        # Leave identical land behind.
-                        else:
-                            if moving_tile_index == -1:
-                                error = input("2moving_tile_index == -1 and was attempted to be used as an index")
-                            current_brane_layout[moving_tile_index] = create_tile_data(0, 0, moving_land_data)
-                            
-                        ## This code automatically deals with killing enemies.
-                        
-                        # Moving into a pit, do nothing.
-                        if rock_destination_land_value == pit_value:
-                            pass
-                        # Moving onto a white tile, glass, or stairs.
-                        elif rock_destination_land_value == white_value or rock_destination_land_value == glass_value or rock_destination_land_value == exit_value:
-                            current_brane_layout[rock_destination_index] = create_tile_data(rock_entity_type, rock_present_value, rock_destination_land_value)
-                        # Moving onto an inactive chain tile.
-                        elif rock_destination_land_value == chain_inactive_value:
-                            current_brane_layout[rock_destination_index] = create_tile_data(rock_entity_type, rock_present_value, chain_active_value)
-                        # Moving onto an ACTIVE chain tile.
-                        elif rock_destination_land_value == chain_active_value:
-                            current_brane_layout = trigger_chain_disperse(list(current_brane_layout), rock_destination_index)
-                            
-                            if get_player_index(current_brane_layout, handling_absent_case=True) == -1:
-                                print("Error! Death by remote chain dispersion??")
-                                death_flag = True
-                                break
-                        # Unhandled tile type.
-                        else:
-                            error = input("Error! Cannot resolve world state!1 " + current_move + " " + str(rock_destination_land_value))
-                else:
-                    # Update glass and chain counters.
-                    if (moving_land_data == glass_value):
-                        steps_since_last_glass = 0
-                    elif (moving_land_data == chain_inactive_value or moving_land_data == chain_active_value):
-                        steps_since_last_chain = 0
-
-                    # Tile we're moving into is a pit. (Or an active chain, which is similar.)
-                    if moving_land_data == pit_value or moving_land_data == chain_active_value:
-                        # Moving into a pit is a death sentence.
-                        if not wings or (wings and floating(current_brane_layout)):
-                            # Remove player from source tile
-                            if player_land_data == glass_value:
-                                current_brane_layout[player_index] = pit_value
-                            else:
-                                current_brane_layout[player_index] = create_tile_data(0, 0, player_land_data)
-                            
-                            # If the tile we're moving into is an active chain, trigger a dispersion.
-                            if moving_land_data == chain_active_value:
-                                if moving_tile_index == -1:
-                                    error = input("3moving_tile_index == -1 and was attempted to be used as an index")
-                                current_brane_layout = trigger_chain_disperse(list(current_brane_layout), moving_tile_index)
-                            
-                            # Final check to see if the brand is carved by this final action.
-                            if not is_brand_carved(current_brane_layout, brand_dicts[chosen_brand]):
-                                print("Error! Death by pit??")
-                                death_flag = True
-                                break
-                        # nah bro we good I got wings and I'm not floating either
-                        else:
-                            # Remove player from source tile
-                            if player_land_data == glass_value:
-                                current_brane_layout[player_index] = pit_value
-                            else:
-                                current_brane_layout[player_index] = create_tile_data(0, 0, player_land_data)
-                            
-                            # Disperse chains
-                            if moving_land_data == chain_active_value:
-                                if moving_tile_index == -1:
-                                    error = input("4moving_tile_index == -1 and was attempted to be used as an index")
-                                current_brane_layout = trigger_chain_disperse(list(current_brane_layout), moving_tile_index)
-                            
-                            # Add player to destination tile
-                            if moving_tile_index == -1:
-                                error = input("5moving_tile_index == -1 and was attempted to be used as an index")
-                            current_brane_layout[moving_tile_index] = create_tile_data(1, direction_letter_to_number(current_move), 0)
-                    # Tile is a solid tile, glass, chain, or walkable stairs.
-                    elif moving_land_data == white_value or moving_land_data == glass_value or moving_land_data == chain_inactive_value or (moving_land_data == exit_value and not stairs_exitable_question(current_brane_layout)):
-                        steps_since_last_bump += 1
-                        
-                        # Remove player from source tile
-                        if player_land_data == glass_value:
-                            current_brane_layout[player_index] = pit_value
-                        else:
-                            current_brane_layout[player_index] = create_tile_data(0, 0, player_land_data)
-                            
-                        # Add player to destination tile
-                        if moving_land_data == chain_inactive_value:
-                            if moving_tile_index == -1:
-                                error = input("6moving_tile_index == -1 and was attempted to be used as an index")
-                            current_brane_layout[moving_tile_index] = create_tile_data(1, direction_letter_to_number(current_move), chain_active_value)
-                        else:
-                            if moving_tile_index == -1:
-                                error = input("7moving_tile_index == -1 and was attempted to be used as an index")
-                            current_brane_layout[moving_tile_index] = create_tile_data(1, direction_letter_to_number(current_move), moving_land_data)
-                    # Tile we're moving into is active stairs.
-                    elif moving_land_data == exit_value and stairs_exitable_question(current_brane_layout):
-                        print("Error! Death by stairs??")
-                        death_flag = True
-                        break
-                    # Tile is a wall. This is basically the same as solid tile except we only change the facing direction.
-                    elif moving_land_data == wall_value:
-                        steps_since_last_bump = 0
-                        
-                        if floating(current_brane_layout):
-                            print("Error! Death by wing pushing??")
-                            death_flag = True
-                            break
-                        
-                        current_brane_layout[player_index] = create_tile_data(1, direction_letter_to_number(current_move), player_land_data)
-                    else:
-                        error = input("Error! Cannot resolve world state!2 " + current_move)
-            else:
-                error = input("Error! Cannot resolve world state!3 " + current_move)
+            brane_walk(current_brane_layout, current_move)
 
             ## Did we do it?
             if is_brand_carved(current_brane_layout, brand_dicts[chosen_brand]):
@@ -1760,3 +1563,212 @@ while True:
     if not predestination_mode:
         print("THIS IS NOT PREDESTINATION MODE!!!!!!")
     blargh = input("Success! Found this route for " + chosen_brane + " brane carving " + chosen_brand)
+
+#### State traversal function has a special spot right here. ####
+def brane_walk(brane_state: list[int], input: str):
+    if input == "Z":
+        full_faced_tile_data = tile_in_direction_of_player(brane_state)
+        faced_land_data = get_land_value_from_tile(full_faced_tile_data)
+        
+        # Is tile invalid for both pickup and placedown?
+        if full_faced_tile_data != faced_land_data or faced_land_data == wall_value: # (Explanation: this inequality means there is an entity on the tile, meaning an enemy or a rock. The second one is just checking if the tile is a wall, which is self-explanatory.) 
+            if safe_choices == ["Z"]:
+                print("Only valid move is Z but Z does nothing. Resetting...")
+                death_flag = True
+                break
+            
+            working_moves = working_moves[:-1]
+        # Tile is valid for pickup.
+        elif faced_land_data != pit_value and faced_land_data != wall_value and void_rod_can_take():
+            steps_since_last_bump += 1
+            
+            # Put tile on void rod.
+            held_tiles.append(faced_land_data)
+
+            # Remove the tile from the world.
+            brane_state[index_tile_in_direction_of_player(brane_state)] = 0
+        # Placing tile.
+        elif full_faced_tile_data == pit_value and len(held_tiles) > 0:
+            steps_since_last_bump += 1
+            
+            # Place the tile into the world.
+            brane_state[index_tile_in_direction_of_player(brane_state)] = held_tiles[-1]
+
+            # Remove the tile from the void rod.
+            held_tiles.pop()
+        # Cannot do anything.
+        else:
+            if safe_choices == ["Z"]:
+                print("Only valid move is Z but Z does nothing. Resetting...")
+                death_flag = True
+                break
+            
+            working_moves = working_moves[:-1]
+    elif (input == "D" or input == "L" or input == "U" or input == "R"):
+        moving_tile_index = index_tile_in_direction_of_player(brane_state, direction_letter_to_number(input))
+
+        if moving_tile_index == -1:
+            full_moving_tile_data = wall_value
+            moving_land_data = wall_value
+        else:
+            full_moving_tile_data = tile_in_direction_of_player(brane_state, direction_letter_to_number(input))
+            moving_land_data = get_land_value_from_tile(full_moving_tile_data)
+
+        # Moving into a hand (hands!)
+        if get_rock_value_from_tile(full_moving_tile_data) == hands_present_value:
+            print("Error! Death by hand?? Hands?!!")
+            death_flag = True
+            break
+        # Moving into a rock.
+        elif get_rock_value_from_tile(full_moving_tile_data) == rock_present_value:
+            steps_since_last_bump = 0
+            
+            # Determine tile the rock is moving into.
+            rock_destination_index = -1
+            rock_destination_tile_value = 0
+            if input == "D":
+                rock_destination_index = move_cartesian(player_index,0,2)
+                rock_destination_tile_value = tile_at_moved_cartesian(player_index,brane_state,0,2)
+            elif input == "L":
+                rock_destination_index = move_cartesian(player_index,-2,0)
+                rock_destination_tile_value = tile_at_moved_cartesian(player_index,brane_state,-2,0)
+            elif input == "U":
+                rock_destination_index = move_cartesian(player_index,0,-2)
+                rock_destination_tile_value = tile_at_moved_cartesian(player_index,brane_state,0,-2)
+            elif input == "R":
+                rock_destination_index = move_cartesian(player_index,2,0)
+                rock_destination_tile_value = tile_at_moved_cartesian(player_index,brane_state,2,0)
+            
+            rock_destination_land_value = get_land_value_from_tile(rock_destination_tile_value)
+            rock_destination_rock_value = get_rock_value_from_tile(rock_destination_tile_value)
+            
+            # Player does a push.
+            if floating(brane_state):
+                print("Error! Death by wing pushing??")
+                death_flag = True
+                break
+            else:
+                brane_state[player_index] = create_tile_data(1, direction_letter_to_number(input), player_land_data)
+            
+            # If this is a wall or another rock, it can't move.
+            if rock_destination_land_value == wall_value or rock_destination_rock_value == rock_present_value:
+                pass
+            # Otherwise, the rock can move.
+            else:
+                # Moved from glass
+                if moving_land_data == glass_value:
+                    if moving_tile_index == -1:
+                        error = input("1moving_tile_index == -1 and was attempted to be used as an index")
+                    brane_state[moving_tile_index] = 0
+                # Leave identical land behind.
+                else:
+                    if moving_tile_index == -1:
+                        error = input("2moving_tile_index == -1 and was attempted to be used as an index")
+                    brane_state[moving_tile_index] = create_tile_data(0, 0, moving_land_data)
+                    
+                ## This code automatically deals with killing enemies.
+                
+                # Moving into a pit, do nothing.
+                if rock_destination_land_value == pit_value:
+                    pass
+                # Moving onto a white tile, glass, or stairs.
+                elif rock_destination_land_value == white_value or rock_destination_land_value == glass_value or rock_destination_land_value == exit_value:
+                    brane_state[rock_destination_index] = create_tile_data(rock_entity_type, rock_present_value, rock_destination_land_value)
+                # Moving onto an inactive chain tile.
+                elif rock_destination_land_value == chain_inactive_value:
+                    brane_state[rock_destination_index] = create_tile_data(rock_entity_type, rock_present_value, chain_active_value)
+                # Moving onto an ACTIVE chain tile.
+                elif rock_destination_land_value == chain_active_value:
+                    trigger_chain_disperse(brane_state, rock_destination_index)
+                    
+                    if get_player_index(brane_state, handling_absent_case=True) == -1:
+                        print("Error! Death by remote chain dispersion??")
+                        death_flag = True
+                        break
+                # Unhandled tile type.
+                else:
+                    error = input("Error! Cannot resolve world state!1 " + input + " " + str(rock_destination_land_value))
+        else:
+            # Update glass and chain counters.
+            if (moving_land_data == glass_value):
+                steps_since_last_glass = 0
+            elif (moving_land_data == chain_inactive_value or moving_land_data == chain_active_value):
+                steps_since_last_chain = 0
+
+            # Tile we're moving into is a pit. (Or an active chain, which is similar.)
+            if moving_land_data == pit_value or moving_land_data == chain_active_value:
+                # Moving into a pit is a death sentence.
+                if not wings or (wings and floating(brane_state)):
+                    # Remove player from source tile
+                    if player_land_data == glass_value:
+                        brane_state[player_index] = pit_value
+                    else:
+                        brane_state[player_index] = create_tile_data(0, 0, player_land_data)
+                    
+                    # If the tile we're moving into is an active chain, trigger a dispersion.
+                    if moving_land_data == chain_active_value:
+                        if moving_tile_index == -1:
+                            error = input("3moving_tile_index == -1 and was attempted to be used as an index")
+                        trigger_chain_disperse(brane_state, moving_tile_index)
+                    
+                    # Final check to see if the brand is carved by this final action.
+                    if not is_brand_carved(brane_state, brand_dicts[chosen_brand]):
+                        print("Error! Death by pit??")
+                        death_flag = True
+                        break
+                # nah bro we good I got wings and I'm not floating either
+                else:
+                    # Remove player from source tile
+                    if player_land_data == glass_value:
+                        brane_state[player_index] = pit_value
+                    else:
+                        brane_state[player_index] = create_tile_data(0, 0, player_land_data)
+                    
+                    # Disperse chains
+                    if moving_land_data == chain_active_value:
+                        if moving_tile_index == -1:
+                            error = input("4moving_tile_index == -1 and was attempted to be used as an index")
+                        trigger_chain_disperse(brane_state, moving_tile_index)
+                    
+                    # Add player to destination tile
+                    if moving_tile_index == -1:
+                        error = input("5moving_tile_index == -1 and was attempted to be used as an index")
+                    brane_state[moving_tile_index] = create_tile_data(1, direction_letter_to_number(input), 0)
+            # Tile is a solid tile, glass, chain, or walkable stairs.
+            elif moving_land_data == white_value or moving_land_data == glass_value or moving_land_data == chain_inactive_value or (moving_land_data == exit_value and not stairs_exitable_question(brane_state)):
+                steps_since_last_bump += 1
+                
+                # Remove player from source tile
+                if player_land_data == glass_value:
+                    brane_state[player_index] = pit_value
+                else:
+                    brane_state[player_index] = create_tile_data(0, 0, player_land_data)
+                    
+                # Add player to destination tile
+                if moving_land_data == chain_inactive_value:
+                    if moving_tile_index == -1:
+                        error = input("6moving_tile_index == -1 and was attempted to be used as an index")
+                    brane_state[moving_tile_index] = create_tile_data(1, direction_letter_to_number(input), chain_active_value)
+                else:
+                    if moving_tile_index == -1:
+                        error = input("7moving_tile_index == -1 and was attempted to be used as an index")
+                    brane_state[moving_tile_index] = create_tile_data(1, direction_letter_to_number(input), moving_land_data)
+            # Tile we're moving into is active stairs.
+            elif moving_land_data == exit_value and stairs_exitable_question(brane_state):
+                print("Error! Death by stairs??")
+                death_flag = True
+                break
+            # Tile is a wall. This is basically the same as solid tile except we only change the facing direction.
+            elif moving_land_data == wall_value:
+                steps_since_last_bump = 0
+                
+                if floating(brane_state):
+                    print("Error! Death by wing pushing??")
+                    death_flag = True
+                    break
+                
+                brane_state[player_index] = create_tile_data(1, direction_letter_to_number(input), player_land_data)
+            else:
+                error = input("Error! Cannot resolve world state!2 " + input)
+    else:
+        error = input("Error! Cannot resolve world state!3 " + input)
