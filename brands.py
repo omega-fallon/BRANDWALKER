@@ -81,6 +81,8 @@ base_value = 8
 base_value_2 = base_value*base_value
 base_value_3 = base_value*base_value*base_value
 
+bits_per_variable = 3
+
 player_entity_type = 1
 beaver_entity_type = 2
 mimic_entity_type = 3
@@ -106,9 +108,8 @@ def create_tile_data(entity_type: int, entity_value: int, land: int):
     # 3rd slot - entity type (unspecified, player, beaver, mimic, rock/hand)
     # 2nd slot - entity value (not there, down, left, up, right); for rock (no rock, yes rock, button, rock on button, hands (hands!))
     # 1st slot - land tiles value (pit, solid, glass, exit, wall)
-    return entity_type*base_value_2 + entity_value*base_value + land
+    return (entity_type << (bits_per_variable*2)) | (entity_value << bits_per_variable) | land
 
-bits_per_variable = 3
 ## Given a tile value, extracts the entity type value.
 def get_entity_type_from_tile(x: int):
     return x >> bits_per_variable*2
@@ -1114,7 +1115,7 @@ while True:
     
     flag = False
     for i in range(36):
-        if brane_dicts[chosen_brane][i] == 4 and brand_dicts[chosen_brand][i] == 0:
+        if brane_dicts[chosen_brane][i] == wall_value and brand_dicts[chosen_brand][i] == void_value:
             flag = True
             break
     if flag:
@@ -1486,7 +1487,7 @@ while True:
                 faced_land_data = get_land_value_from_tile(full_faced_tile_data)
                 
                 # Is tile invalid for both pickup and placedown?
-                if full_faced_tile_data != faced_land_data or faced_land_data == 4: # (Explanation: this inequality means there is an entity on the tile, meaning an enemy or a rock. The second one is just checking if the tile is a wall, which is self-explanatory.) 
+                if full_faced_tile_data != faced_land_data or faced_land_data == wall_value: # (Explanation: this inequality means there is an entity on the tile, meaning an enemy or a rock. The second one is just checking if the tile is a wall, which is self-explanatory.) 
                     if safe_choices == ["Z"]:
                         print("Only valid move is Z but Z does nothing. Resetting...")
                         death_flag = True
