@@ -108,9 +108,10 @@ def create_tile_data(entity_type: int, entity_value: int, land: int):
     # 1st slot - land tiles value (pit, solid, glass, exit, wall)
     return entity_type*base_value_2 + entity_value*base_value + land
 
+bits_per_variable = 3
 ## Given a tile value, extracts the entity type value.
 def get_entity_type_from_tile(x: int):
-    return int(x/base_value_2)
+    return x >> bits_per_variable*2
 
 ## Given a tile value, extracts the rock value.
 def get_rock_value_from_tile(x: int):
@@ -118,7 +119,7 @@ def get_rock_value_from_tile(x: int):
         return 0
         
     x -= base_value_2*rock_entity_type
-    return int(x / base_value)
+    return x >> bits_per_variable
 
 ## Given a tile value, extracts the mimic value.
 def get_mimic_value_from_tile(x: int):
@@ -126,14 +127,14 @@ def get_mimic_value_from_tile(x: int):
         return 0
         
     x -= base_value_2*mimic_entity_type
-    return int(x / base_value)
+    return x >> bits_per_variable
 ## Given a tile value, extracts the beaver value.
 def get_beaver_value_from_tile(x: int):
     if get_entity_type_from_tile(x) != beaver_entity_type:
         return 0
         
     x -= base_value_2*beaver_entity_type
-    return int(x / base_value)
+    return x >> bits_per_variable
 
 ## Given a tile value, extracts the player value.
 def get_player_value_from_tile(x: int):
@@ -141,7 +142,7 @@ def get_player_value_from_tile(x: int):
         return 0
         
     x -= base_value_2*1
-    return int(x / base_value)
+    return x >> bits_per_variable
     
 ## Given a tile value, extracts the land value.
 def get_land_value_from_tile(x: int):
