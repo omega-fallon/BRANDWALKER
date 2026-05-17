@@ -1146,14 +1146,15 @@ while True:
             elif len(lines) % 2 != 0:
                 error = input("Cache is fucked the hell up.")
             else:
+                # Read and filter
                 for i in range(len(lines)):
                     if i % 2 == 0:
-                        if combo_name() in known_solutions and lines[i].strip() == known_solutions[combo_name()]:
+                        if combo_name() in known_solutions and known_solutions[combo_name()].startswith(lines[i].strip()):
                             pass
                         else:
                             bad_solutions.append(lines[i].strip())
                     else:
-                        if combo_name() in known_solutions and lines[i-1].strip() == known_solutions[combo_name()]:
+                        if combo_name() in known_solutions and known_solutions[combo_name()].startswith(lines[i-1].strip()):
                             pass
                         else:
                             bad_solutions_distance.append(int(lines[i].strip()))
