@@ -704,7 +704,7 @@ def safe_choice_list(brane_state: list[int], stupid_flaggot: bool = False):
         choices.remove("Z")
     ## Special case.
     elif (chosen_brand == "add" and chosen_brane == "add") or (chosen_brand == "lev" and chosen_brane == "lev"):
-        if not brane_has_stairs_question(brane_state):
+        if not (faced_tile_land_value == exit_value and void_rod_can_take()):
             choices.remove("Z")
 
     ## The tile in front is a wall, and there are no monsters to make wasting a turn meaningful.
@@ -1565,7 +1565,7 @@ while True:
                         current_brane_layout[player_index] = create_tile_data(1, direction_letter_to_number(current_move), player_land_data)
                     
                     # If this is a wall or another rock, it can't move.
-                    if rock_destination_land_value == 4 or rock_destination_rock_value == rock_present_value:
+                    if rock_destination_land_value == wall_value or rock_destination_rock_value == rock_present_value:
                         pass
                     # Otherwise, the rock can move.
                     else:
@@ -1601,7 +1601,7 @@ while True:
                                 break
                         # Unhandled tile type.
                         else:
-                            error = input("Error! Cannot resolve world state!1 " + current_move)
+                            error = input("Error! Cannot resolve world state!1 " + current_move + " " + str(rock_destination_land_value))
                 else:
                     # Update glass and chain counters.
                     if (moving_land_data == glass_value):
