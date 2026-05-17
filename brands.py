@@ -224,14 +224,14 @@ def get_player_index(brane_state: list[int], handling_absent_case = False):
     for i in range(36):
         if get_entity_type_from_tile(brane_state[i]) == player_entity_type:
             if store != -1:
-                error = input("Error! Multiple players found by get_player_index()! "+ display_brane(brane_state))
+                error = input("Error! Multiple players found by get_player_index()\n"+ display_brane(brane_state))
 
             store = i
 
     if store != -1 or handling_absent_case:
         return store
 
-    error = input("Error! Player could not be found by get_player_index()! "+ display_brane(brane_state))
+    error = input("Error! Player could not be found by get_player_index()!\n"+ display_brane(brane_state))
 
 ## Given a brane state, returns the index of the stairs.
 def get_stairs_index(brane_state: list[int]):
@@ -239,14 +239,14 @@ def get_stairs_index(brane_state: list[int]):
     for i in range(36):
         if get_land_value_from_tile(brane_state[i]) == exit_value:
             if store != -1:
-                error = input("Error! Multiple stairs found by get_stairs_index()! "+ display_brane(brane_state))
+                error = input("Error! Multiple stairs found by get_stairs_index()!\n"+ display_brane(brane_state))
 
             store = i
 
     if store != -1:
         return store
 
-    error = input("Error! Stairs could not be found by get_stairs_index()! "+ display_brane(brane_state))
+    error = input("Error! Stairs could not be found by get_stairs_index()!\n"+ display_brane(brane_state))
 
 ## Given a brane state, returns the land value of the tile the player is standing on.
 def get_player_land_value(brane_state: list[int]):
@@ -502,29 +502,23 @@ def predicted_distance_change(brane_state: list[int], input_letter: str):
     elif input_letter == "D" or input_letter == "L" or input_letter == "U" or input_letter == "R":
         # Standing on glass.
         if get_player_land_value(brane_state) == glass_value:
-            # Tile we're moving into is glass, dooming BOTH our tiles.
-            if faced_tile_land_value == glass_value:
-                if brand[get_player_index(brane_state)] == 0:
-                    total += -1
-                else:
-                    total += 1
-                if brand[index_tile_in_direction_of_player(brane_state)] == 0:
-                    total += -1
-                else:
-                    total += 1
             # Tile we're moving into is moveinto-able, but not glass
-            elif not (faced_tile_land_value == exit_value and stairs_exitable_question(brane_state)) and faced_tile_land_value != wall_value:
+            if not (faced_tile_land_value == exit_value and stairs_exitable_question(brane_state)) and faced_tile_land_value != wall_value:
                 # Determine the effect of this action.
                 if brand[get_player_index(brane_state)] == 0:
                     total += -1
                 else:
                     total += 1
+           
         # Moving into glass
-        elif faced_tile_land_value == glass_value:
+        if faced_tile_land_value == glass_value:
             if brand[index_tile_in_direction_of_player(brane_state)] == 0:
                 total += -1
             else:
                 total += 1
+        # Moving onto an active chain tile.
+        elif faced_tile_land_value == chain_active_value and wings and not floating(brane_state):
+            total += distance_from_heaven(trigger_chain_disperse(brane_state,index_tile_in_direction_of_player(brane_state,letter))) - distance_from_heaven(brane_state)
                     
         # Fractional weights for moving closer to the stairs.
         if brane_has_stairs_question(brane_state):
@@ -627,6 +621,9 @@ def three_line_present_strict(brane_state: list[int]):
     
 ## Given a brane layout and starting position, triggers a chain dispersion.
 def trigger_chain_disperse(brane_state: list[int], i: int):
+    if i < 0:
+        return brane_state
+    
     triggered_tiles = {i}
     
     done_something = True
@@ -662,6 +659,10 @@ def trigger_chain_disperse(brane_state: list[int], i: int):
         
     return brane_state
     
+## Shorthand for a use case of the above.
+def trigger_chain_disperse_direction(brane_state: list[int], direction):
+    return trigger_chain_disperse(brane_state,index_tile_in_direction_of_player(brane_state,direction))
+    
 ## Given a brane layout, returns the list of not-obviously-stupid inputs.
 cardinals = ["D","L","U","R"]
 def safe_choice_list(brane_state: list[int], stupid_flaggot: bool = False):
@@ -676,25 +677,23 @@ def safe_choice_list(brane_state: list[int], stupid_flaggot: bool = False):
     faced_tile_land_value = get_land_value_from_tile(faced_tile)
 
     ## Deadly or round-ending ##
-    ## Going down stairs or a pit (as shown by human-found optimal Eus solution, falling into a pit can be the requisite final step with glass)
-    if (down_tile_land_value == pit_value and (not wings or floating) and not is_brand_carved_minus_stood_glass(brane_state, brand_dicts[chosen_brand])) or (down_tile_land_value == 3 and stairs_exitable_question(brane_state)):
-        choices.remove("D")
-    if (left_tile_land_value == pit_value and (not wings or floating) and not is_brand_carved_minus_stood_glass(brane_state, brand_dicts[chosen_brand])) or (left_tile_land_value == 3 and stairs_exitable_question(brane_state)):
-        choices.remove("L")
-    if (up_tile_land_value == pit_value and (not wings or floating) and not is_brand_carved_minus_stood_glass(brane_state, brand_dicts[chosen_brand])) or (up_tile_land_value == 3 and stairs_exitable_question(brane_state)):
-        choices.remove("U")
-    if (right_tile_land_value == pit_value and (not wings or floating) and not is_brand_carved_minus_stood_glass(brane_state, brand_dicts[chosen_brand])) or (right_tile_land_value == 3 and stairs_exitable_question(brane_state)):
-        choices.remove("R")
-        
-    ## Breaking a piece of glass that brings total carve-valid tiles below the brand's amount.
-    if "D" in choices and down_tile_land_value == glass_value and count_valids(brane_state)+held_valids() == count_valids(brand_dicts[chosen_brand]):
-        choices.remove("D")
-    if "L" in choices and left_tile_land_value == glass_value and count_valids(brane_state)+held_valids() == count_valids(brand_dicts[chosen_brand]):
-        choices.remove("L")
-    if "U" in choices and up_tile_land_value == glass_value and count_valids(brane_state)+held_valids() == count_valids(brand_dicts[chosen_brand]):
-        choices.remove("U")
-    if "R" in choices and right_tile_land_value == glass_value and count_valids(brane_state)+held_valids() == count_valids(brand_dicts[chosen_brand]):
-        choices.remove("R")
+    for key, value in {"D": down_tile_land_value, "L": left_tile_land_value, "U": up_tile_land_value, "R": right_tile_land_value}.items():
+        # Going down stairs.
+        if value == exit_value and stairs_exitable_question(brane_state):
+            choices.remove(key)
+        # Falling into a pit while wingless or floating without standing on glass that's the last piece to remove before the brand is carved.
+        elif value == pit_value:
+            if not wings or floating(brane_state):
+                if not is_brand_carved_minus_stood_glass(brane_state, brand_dicts[chosen_brand]):
+                    choices.remove(key)
+        # Stepping on an active chain while wingless or floating which wouldn't result in the brand being carved.
+        elif value == chain_active_value:
+            if not wings or floating(brane_state):
+                if not (value == chain_active_value and is_brand_carved(trigger_chain_disperse_direction(brane_state, key), brand_dicts[chosen_brand])):
+                    choices.remove(key)
+        ## Breaking a piece of glass that brings total carve-valid tiles below the brand's amount.
+        elif value == glass_value and count_valids(brane_state)+held_valids() == count_valids(brand_dicts[chosen_brand]):
+            choices.remove(key)
         
     ## Dumb but not deadly ##
     ## There is no tile in front of the player and the player does not have any tile stored. There is no point in pressing "Z"
@@ -788,6 +787,16 @@ def safe_choice_list(brane_state: list[int], stupid_flaggot: bool = False):
             if up_tile_land_value == pit_value or up_tile_land_value == white_value or (up_tile_land_value == exit_value and not stairs_exitable_question(brane_state)):
                 choices.add("U")
             if right_tile_land_value == pit_value or right_tile_land_value == white_value or (right_tile_land_value == exit_value and not stairs_exitable_question(brane_state)):
+                choices.add("R")
+        # Dispersing chain tiles to carve the brand.
+        else:
+            if down_tile_land_value == chain_active_value and is_brand_carved(trigger_chain_disperse_direction(brane_state, "D"), brand_dicts[chosen_brand]):
+                choices.add("D")
+            if left_tile_land_value == chain_active_value and is_brand_carved(trigger_chain_disperse_direction(brane_state, "L"), brand_dicts[chosen_brand]):
+                choices.add("L")
+            if up_tile_land_value == chain_active_value and is_brand_carved(trigger_chain_disperse_direction(brane_state, "U"), brand_dicts[chosen_brand]):
+                choices.add("U")
+            if right_tile_land_value == chain_active_value and is_brand_carved(trigger_chain_disperse_direction(brane_state, "R"), brand_dicts[chosen_brand]):
                 choices.add("R")
     
     stupid_horse = []
@@ -1011,6 +1020,8 @@ known_solutions = {
     # Sum[Divide[\(40)35+1\(41)!,\(40)\(40)2+b\(41)! * 3! * \(40)30-b\(41)! * 1!\(41)]* \(40)3+30-b\(41) * 4,{b,0,33-15}]
     
     "mon+eus": "UUZLDDUZUZLRZRRZLLDZDDDRRZLUULUURLZLZDLDDRDRRRZLZRRUUULZLZDZDZUUULLUDZRRDZULLDLRZRZLDZLURZUDZDUZ",
+    
+    "lev+lev": "LZRDDLDRDLLDLULLURURUULDLDU",
 }
 
 ## ## ## ## ## ##
@@ -1068,6 +1079,9 @@ while True:
         continue
     if chosen_brane == "endless":
         endless = not endless
+        continue
+    if chosen_brane == "pred" or chosen_brane == "predestination":
+        predestination_mode = not predestination_mode
         continue
         
     chosen_brand = input("...And the brand?\n")
@@ -1212,23 +1226,22 @@ while True:
                             # No wings...
                             if not wings:
                                 # Not holding a solid tile...
-                                if not (1 in held_tiles) and not (not stairs_exitable_question(brane_state) and (2 in held_tiles)):
+                                if not (white_value in held_tiles) and not (not stairs_exitable_question(brane_state) and (exit_value in held_tiles)):
                                     # There exists no 3-line for the player to traverse with.
                                     if not three_line_present_strict(brane_state):
                                         print("Unrecoverable situation: no 3 line and glass can't be broken.")
                                         return True
                 
-                # Cornered
-                # Not floating...
-                if not floating(brane_state):
+                # Cornered.
+                if not wings or floating(brane_state):
                     # Surrounded, surrounded, surrounded, surrounded.
-                    if get_down_tile_land_value(brane_state) == 0 or get_down_tile_land_value(brane_state) == 4:
-                        if get_left_tile_land_value(brane_state) == 0 or get_left_tile_land_value(brane_state) == 4:
-                            if get_up_tile_land_value(brane_state) == 0 or get_up_tile_land_value(brane_state) == 4:
-                                if get_right_tile_land_value(brane_state) == 0 or get_right_tile_land_value(brane_state) == 4:
+                    if get_down_tile_land_value(brane_state) == pit_value or get_down_tile_land_value(brane_state) == wall_value:
+                        if get_left_tile_land_value(brane_state) == pit_value or get_left_tile_land_value(brane_state) == wall_value:
+                            if get_up_tile_land_value(brane_state) == pit_value or get_up_tile_land_value(brane_state) == wall_value:
+                                if get_right_tile_land_value(brane_state) == pit_value or get_right_tile_land_value(brane_state) == wall_value:
                                     # Facing the corner or facing a pit without anything to place.
                                     faced_tile_land_value = get_land_value_from_tile(tile_in_direction_of_player(brane_state))
-                                    if faced_tile_land_value == 4 or (faced_tile_land_value == 0 and len(held_tiles) == 0):
+                                    if faced_tile_land_value == wall_value or (faced_tile_land_value == pit_value and len(held_tiles) == 0):
                                         return True
 
             
@@ -1325,6 +1338,11 @@ while True:
                         working_moves = working_moves[:-3]
                         working_moves += (store[-1])
             
+                if last_trimmed == moving_loops:
+                    print("Trimming complete.")
+                else:
+                    print("Trimming complete without doing anything.")
+            
             too_long = False
             if combo_name() in known_solutions and len(working_moves) > len(known_solutions[combo_name()]):
                 print("Working moves too long. Resetting...")
@@ -1369,7 +1387,9 @@ while True:
                 steps_since_last_chain += 1
 
             ## Check for safe choices.
+            print("penis cock balls penis!!")
             safe_choices = safe_choice_list(current_brane_layout)
+            print("pussy vagina!!")
 
             ## No safe choices!
             if len(safe_choices) == 0:
@@ -1529,7 +1549,12 @@ while True:
                     rock_destination_rock_value = get_rock_value_from_tile(rock_destination_tile_value)
                     
                     # Player does a push.
-                    current_brane_layout[player_index] = create_tile_data(1, direction_letter_to_number(current_move), player_land_data)
+                    if floating(current_brane_layout):
+                        print("Error! Death by wing pushing??")
+                        death_flag = True
+                        break
+                    else:
+                        current_brane_layout[player_index] = create_tile_data(1, direction_letter_to_number(current_move), player_land_data)
                     
                     # If this is a wall or another rock, it can't move.
                     if rock_destination_land_value == 4 or rock_destination_rock_value == rock_present_value:
@@ -1561,6 +1586,11 @@ while True:
                         # Moving onto an ACTIVE chain tile.
                         elif rock_destination_land_value == chain_active_value:
                             current_brane_layout = trigger_chain_disperse(current_brane_layout, rock_destination_index)
+                            
+                            if get_player_index(current_brane_layout, handling_absent_case=True) == -1:
+                                print("Error! Death by remote chain dispersion??")
+                                death_flag = True
+                                break
                         # Unhandled tile type.
                         else:
                             error = input("Error! Cannot resolve world state!1 " + current_move)
@@ -1638,6 +1668,11 @@ while True:
                     elif moving_land_data == wall_value:
                         steps_since_last_bump = 0
                         
+                        if floating(current_brane_layout):
+                            print("Error! Death by wing pushing??")
+                            death_flag = True
+                            break
+                        
                         current_brane_layout[player_index] = create_tile_data(1, direction_letter_to_number(current_move), player_land_data)
                     else:
                         error = input("Error! Cannot resolve world state!2 " + current_move)
@@ -1652,6 +1687,10 @@ while True:
         if death_flag:
             if not too_long and debug_deaths:
                 error = input("Why did we die?")
+                
+            if predestination_mode:
+                error = input("Died in predestination mode.")
+                
             continue
         
         break
