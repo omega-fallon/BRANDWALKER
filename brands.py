@@ -454,7 +454,7 @@ def taxicab_distance(a: int, b: int):
     
 ## Returns True if player is floating.
 def floating(brane_state: list[int]):
-    return get_land_value_from_tile(brane_state[get_player_index(brane_state)]) == pit_value
+    return get_player_land_value(brane_state) == pit_value
     
 ## Returns True if the tile is undesirable (or impossible) to move into. Takes a land value.
 def land_undesirable(land: int, brane_state: list[int]):
@@ -518,7 +518,7 @@ def predicted_distance_change(brane_state: list[int], input_letter: str):
                 total += 1
         # Moving onto an active chain tile.
         elif faced_tile_land_value == chain_active_value and wings and not floating(brane_state):
-            total += distance_from_heaven(trigger_chain_disperse(brane_state,index_tile_in_direction_of_player(brane_state,letter))) - distance_from_heaven(brane_state)
+            total += distance_from_heaven(trigger_chain_disperse(list(brane_state),index_tile_in_direction_of_player(brane_state,letter))) - distance_from_heaven(brane_state)
                     
         # Fractional weights for moving closer to the stairs.
         if brane_has_stairs_question(brane_state):
@@ -689,7 +689,7 @@ def safe_choice_list(brane_state: list[int], stupid_flaggot: bool = False):
         # Stepping on an active chain while wingless or floating which wouldn't result in the brand being carved.
         elif value == chain_active_value:
             if not wings or floating(brane_state):
-                if not (value == chain_active_value and is_brand_carved(trigger_chain_disperse_direction(brane_state, key), brand_dicts[chosen_brand])):
+                if not (value == chain_active_value and is_brand_carved(trigger_chain_disperse_direction(list(brane_state), key), brand_dicts[chosen_brand])):
                     choices.remove(key)
         ## Breaking a piece of glass that brings total carve-valid tiles below the brand's amount.
         elif value == glass_value and count_valids(brane_state)+held_valids() == count_valids(brand_dicts[chosen_brand]):
@@ -702,6 +702,10 @@ def safe_choice_list(brane_state: list[int], stupid_flaggot: bool = False):
     ## There is a tile in front of the player and the player lacks the ability to take it. There is no point in pressing "Z"
     elif faced_tile_land_value != pit_value and not void_rod_can_take():
         choices.remove("Z")
+    ## Special case.
+    elif (chosen_brand == "add" and chosen_brane == "add") or (chosen_brand == "lev" and chosen_brane == "lev"):
+        if not brane_has_stairs_question(brane_state):
+            choices.remove("Z")
 
     ## The tile in front is a wall, and there are no monsters to make wasting a turn meaningful.
     ## Hitting a wall to your side CAN be useful to reposition, so we will not discount it!
@@ -719,6 +723,7 @@ def safe_choice_list(brane_state: list[int], stupid_flaggot: bool = False):
                 if x not in choices:
                     continue
                 
+                #print("wonderwall\n"+display_brane(brane_state))
                 # Confirm potential movement tile attributes and make pawn tile variables.
                 if x == "D" and down_tile_land_value not in breakables and not land_undesirable(down_tile_land_value,brane_state):
                     pawn_land_value_attack_1 = land_at_moved_cartesian(player_index,brane_state,1,1)
@@ -757,6 +762,7 @@ def safe_choice_list(brane_state: list[int], stupid_flaggot: bool = False):
                     #print("Pawn values found not to be dead end:",pawn_land_value_attack_1,pawn_land_value_attack_2,pawn_land_value_first_turn)
                     #print("Direction:",x)
     
+    #print("because you're so smooth")
     if not here_be_monsters_question(brane_state) and "Z" in choices:
         # Double z's are never useful without monsters
         if len(working_moves) > 0 and working_moves[-1] == "Z":
@@ -765,12 +771,14 @@ def safe_choice_list(brane_state: list[int], stupid_flaggot: bool = False):
         elif not wings and void_rod_can_take() and faced_tile_land_value != 0 and brane_has_stairs_question(brane_state) and int(land_undesirable(down_tile_land_value,brane_state))+int(land_undesirable(down_tile_land_value,brane_state))+int(land_undesirable(down_tile_land_value,brane_state))+int(land_undesirable(down_tile_land_value,brane_state)) == 3:
             choices.remove("Z")
     
+    #print("one week")
     ## Historically bad choices ##
     for choice in {"D","L","U","R","Z"}:
         if (working_moves + choice) in bad_solutions and choice in choices:
             choices.remove(choice)
             #notice = input("We learned a lesson!! "+str(working_moves + choice)+" against "+str(choice))
             
+    #print("somebody once told me")
     ## Obviously correct choices ##
     if not is_brand_carved(brane_state, brand_dicts[chosen_brand]):
         # If removing the stairs is the last step and we're already facing them, always do that.
@@ -790,13 +798,13 @@ def safe_choice_list(brane_state: list[int], stupid_flaggot: bool = False):
                 choices.add("R")
         # Dispersing chain tiles to carve the brand.
         else:
-            if down_tile_land_value == chain_active_value and is_brand_carved(trigger_chain_disperse_direction(brane_state, "D"), brand_dicts[chosen_brand]):
+            if down_tile_land_value == chain_active_value and is_brand_carved(trigger_chain_disperse_direction(list(brane_state), "D"), brand_dicts[chosen_brand]):
                 choices.add("D")
-            if left_tile_land_value == chain_active_value and is_brand_carved(trigger_chain_disperse_direction(brane_state, "L"), brand_dicts[chosen_brand]):
+            if left_tile_land_value == chain_active_value and is_brand_carved(trigger_chain_disperse_direction(list(brane_state), "L"), brand_dicts[chosen_brand]):
                 choices.add("L")
-            if up_tile_land_value == chain_active_value and is_brand_carved(trigger_chain_disperse_direction(brane_state, "U"), brand_dicts[chosen_brand]):
+            if up_tile_land_value == chain_active_value and is_brand_carved(trigger_chain_disperse_direction(list(brane_state), "U"), brand_dicts[chosen_brand]):
                 choices.add("U")
-            if right_tile_land_value == chain_active_value and is_brand_carved(trigger_chain_disperse_direction(brane_state, "R"), brand_dicts[chosen_brand]):
+            if right_tile_land_value == chain_active_value and is_brand_carved(trigger_chain_disperse_direction(list(brane_state), "R"), brand_dicts[chosen_brand]):
                 choices.add("R")
     
     stupid_horse = []
@@ -1387,9 +1395,9 @@ while True:
                 steps_since_last_chain += 1
 
             ## Check for safe choices.
-            print("penis cock balls penis!!")
+            #print("penis cock balls penis!!")
             safe_choices = safe_choice_list(current_brane_layout)
-            print("pussy vagina!!")
+            #print("pussy vagina!!")
 
             ## No safe choices!
             if len(safe_choices) == 0:
@@ -1585,7 +1593,7 @@ while True:
                             current_brane_layout[rock_destination_index] = create_tile_data(rock_entity_type, rock_present_value, chain_active_value)
                         # Moving onto an ACTIVE chain tile.
                         elif rock_destination_land_value == chain_active_value:
-                            current_brane_layout = trigger_chain_disperse(current_brane_layout, rock_destination_index)
+                            current_brane_layout = trigger_chain_disperse(list(current_brane_layout), rock_destination_index)
                             
                             if get_player_index(current_brane_layout, handling_absent_case=True) == -1:
                                 print("Error! Death by remote chain dispersion??")
@@ -1615,7 +1623,7 @@ while True:
                             if moving_land_data == chain_active_value:
                                 if moving_tile_index == -1:
                                     error = input("3moving_tile_index == -1 and was attempted to be used as an index")
-                                current_brane_layout = trigger_chain_disperse(current_brane_layout, moving_tile_index)
+                                current_brane_layout = trigger_chain_disperse(list(current_brane_layout), moving_tile_index)
                             
                             # Final check to see if the brand is carved by this final action.
                             if not is_brand_carved(current_brane_layout, brand_dicts[chosen_brand]):
@@ -1634,7 +1642,7 @@ while True:
                             if moving_land_data == chain_active_value:
                                 if moving_tile_index == -1:
                                     error = input("4moving_tile_index == -1 and was attempted to be used as an index")
-                                current_brane_layout = trigger_chain_disperse(current_brane_layout, moving_tile_index)
+                                current_brane_layout = trigger_chain_disperse(list(current_brane_layout), moving_tile_index)
                             
                             # Add player to destination tile
                             if moving_tile_index == -1:
@@ -1747,4 +1755,6 @@ while True:
             print("Looped more times than bad_solutions entries. Bug!")
         
         print("Soft predestination warning: the weirdo_flag was never triggered, meaning past learning has no effect on the thresholds displayed here.")
+    if not predestination_mode:
+        print("THIS IS NOT PREDESTINATION MODE!!!!!!")
     blargh = input("Success! Found this route for " + chosen_brane + " brane carving " + chosen_brand)
