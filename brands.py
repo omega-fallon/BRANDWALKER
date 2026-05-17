@@ -2,6 +2,7 @@
 
 ## TODO and SUGGESTIONS
 ## - "i would recommend setting bits and then bit masking for tile properties instead of polynomial coding, cause checking divisibility might be slower "
+## ADD A CACHE FOR FOUND BAD SOLUTIONS
 
 #### Functions ####
 
@@ -20,11 +21,11 @@ def display_brane(brane: list[int]):
 
     string = ""
     for i in range(36):
-        string_to_add = "X"
+        string_to_add = "?"
         
         if brane[i] == pit_value:
             string_to_add = "_"
-        elif brane[i] == solid_value:
+        elif brane[i] == white_value:
             if stupid_display_crap:
                 string_to_add = "#"
             else:
@@ -40,16 +41,18 @@ def display_brane(brane: list[int]):
                 string_to_add = "0"
             else:
                 string_to_add = "Θ"
-        elif brane[i] == chain_inactive_value:
+        elif brane[i] == chain_active_value:
             if stupid_display_crap:
                 string_to_add = "*"
             else:
                 string_to_add = "•"
-        
-        if get_rock_value_from_tile(brane[i]) == 1 or get_rock_value_from_tile(brane[i]) == 3:
-            string_to_add = "R"
-        elif get_rock_value_from_tile(brane[i]) == 2:
+        elif brane[i] == button_value:
             string_to_add = "B"
+        
+        if get_rock_value_from_tile(brane[i]) == rock_present_value:
+            string_to_add = "R"
+        elif get_rock_value_from_tile(brane[i]) == hands_present_value:
+            string_to_add = "H"
         
         if get_player_value_from_tile(brane[i]) == 1:
             string_to_add = "V"
@@ -87,7 +90,7 @@ rock_present_value = 1
 hands_present_value = 2
 
 pit_value = 0
-solid_value = 1
+white_value = 1
 glass_value = 2
 chain_inactive_value = 3
 chain_active_value = 4
@@ -209,23 +212,23 @@ def is_brand_carved_minus_stood_glass(brane_state: list[int], brand: list[int]):
             continue
         elif i_brane_state_land != pit_value and i_brane_state_land != exit_value and brand[i] == 1:
             continue
-        elif i_brane_state_land == glass_value and get_player_value_from_tile(brane_state[i]) > 0 and brand[i] == 0:
+        elif i_brane_state_land == glass_value and get_entity_type_from_tile(brane_state[i]) == player_entity_type and brand[i] == 0:
             continue
         return False
 
     return True
 
 ## Given a brane state, returns the index of the player's position.
-def get_player_index(brane_state: list[int]):
+def get_player_index(brane_state: list[int], handling_absent_case = False):
     store = -1
     for i in range(36):
-        if get_player_value_from_tile(brane_state[i]) > 0:
+        if get_entity_type_from_tile(brane_state[i]) == player_entity_type:
             if store != -1:
                 error = input("Error! Multiple players found by get_player_index()! "+ display_brane(brane_state))
 
             store = i
 
-    if store != -1:
+    if store != -1 or handling_absent_case:
         return store
 
     error = input("Error! Player could not be found by get_player_index()! "+ display_brane(brane_state))
@@ -387,7 +390,7 @@ def count_state_1s(brane_state: list[int]):
 
     counter = 0
     for i in range(36):
-        if (get_land_value_from_tile(brane_state[i]) == solid_value):
+        if (get_land_value_from_tile(brane_state[i]) == white_value):
             counter += 1
     return counter
 
@@ -423,16 +426,19 @@ def distance_from_heaven(brane_state: list[int], brand: list[int]):
         
         if i_brane_state_land == pit_value and brand[i] == 0:
             continue
-        elif (i_brane_state_land != pit_value or i_brane_state_land != exit_value) and brand[i] == 1:
+        elif i_brane_state_land != pit_value and i_brane_state_land != exit_value and brand[i] == 1:
             continue
         
         distance += 1
         
     # Failure states get special penalty.
-    if special_failure_states(brane_state):
+    if get_player_index(brane_state, handling_absent_case = True) == -1:
         distance += 10
-    if len(safe_choice_list(brane_state,True)) == 0:
-        distance += 10
+    else:
+        if special_failure_states(brane_state):
+            distance += 10
+        if len(safe_choice_list(brane_state,True)) == 0:
+            distance += 10
     
     return distance
     
@@ -452,7 +458,7 @@ def floating(brane_state: list[int]):
     
 ## Returns True if the tile is undesirable (or impossible) to move into. Takes a land value.
 def land_undesirable(land: int, brane_state: list[int]):
-    return (land == pit_value and wings and floating(brane_state)) or (land == pit_value and not wings) or land == wall_value or (land == exit_value and stairs_exitable_question(brane_state))
+    return ((land == pit_value or land == chain_active_value) and wings and floating(brane_state)) or ((land == pit_value or land == chain_active_value) and not wings) or land == wall_value or (land == exit_value and stairs_exitable_question(brane_state))
     
 ## Cleaner stringification for arrays of moves.
 def array_stringify(array: list[str]):
@@ -606,7 +612,7 @@ def land_at_moved_cartesian(i: int, brane_state: list[int], x: int, y: int):
     
 ## Returns true if the land value of this tile is 1 or (3, inactive).
 def effective_type_1(i: int, brane_state: list[int]):
-    return (get_land_value_from_tile(i) == solid_value or (get_land_value_from_tile(i) == exit_value and not stairs_exitable_question(brane_state))) and get_entity_type_from_tile(i) == 0
+    return (get_land_value_from_tile(i) == white_value or (get_land_value_from_tile(i) == exit_value and not stairs_exitable_question(brane_state))) and get_entity_type_from_tile(i) == 0
     
 ## Returns true if there is a 3 line of moveable land tiles. This includes only type-1 and inactive type-3.
 def three_line_present_strict(brane_state: list[int]):
@@ -633,18 +639,22 @@ def trigger_chain_disperse(brane_state: list[int], i: int):
                 error = input("triggered_i isn't an active chain: "+str(triggered_i)+" "+str(triggered_tiles))
                 
             # Check each direction.
-            if triggered_i-1 >= 0 and triggered_i-1 <= 35 and triggered_i-1 not in triggered_tiles and get_land_value_from_tile(brane_state[triggered_i-1]) == chain_active_value:
+            if triggered_i-1 >= 0 and triggered_i-1 not in triggered_tiles and get_land_value_from_tile(brane_state[triggered_i-1]) == chain_active_value:
                 done_something = True
                 triggered_tiles.add(triggered_i-1)
-            if triggered_i+1 >= 0 and triggered_i+1 <= 35 and triggered_i+1 not in triggered_tiles and get_land_value_from_tile(brane_state[triggered_i+1]) == chain_active_value:
+                break
+            if triggered_i+1 <= 35 and triggered_i+1 not in triggered_tiles and get_land_value_from_tile(brane_state[triggered_i+1]) == chain_active_value:
                 done_something = True
                 triggered_tiles.add(triggered_i+1)
-            if triggered_i-6 >= 0 and triggered_i-6 <= 35 and triggered_i-6 not in triggered_tiles and get_land_value_from_tile(brane_state[triggered_i-6]) == chain_active_value:
+                break
+            if triggered_i-6 >= 0 and triggered_i-6 not in triggered_tiles and get_land_value_from_tile(brane_state[triggered_i-6]) == chain_active_value:
                 done_something = True
                 triggered_tiles.add(triggered_i-6)
-            if triggered_i+6 >= 0 and triggered_i+6 <= 35 and triggered_i+6 not in triggered_tiles and get_land_value_from_tile(brane_state[triggered_i+6]) == chain_active_value:
+                break
+            if triggered_i+6 <= 35 and triggered_i+6 not in triggered_tiles and get_land_value_from_tile(brane_state[triggered_i+6]) == chain_active_value:
                 done_something = True
                 triggered_tiles.add(triggered_i+6)
+                break
                 
     # Remove the tiles.
     for triggered_i in triggered_tiles:
@@ -701,11 +711,8 @@ def safe_choice_list(brane_state: list[int], stupid_flaggot: bool = False):
 
     ## Pointless movements (repetitive ones are trimmed afterward, not outright removed) ##
     if not here_be_monsters_question(brane_state):
-        # Entering a dead end. (Smart bun.)
-        #if get_player_land_value(brane_state) != 2:
-        
         # Entering a dead end. (Dumb bun.)
-        if get_player_land_value(brane_state) != 2:
+        if get_player_land_value(brane_state) not in breakables:
             player_index = get_player_index(brane_state)
             
             for x in cardinals:
@@ -774,13 +781,13 @@ def safe_choice_list(brane_state: list[int], stupid_flaggot: bool = False):
         elif is_brand_carved_minus_stood_glass(brane_state, brand_dicts[chosen_brand]):
             print("Obvious choice!!")
             choices.clear()
-            if down_tile_land_value == pit_value or down_tile_land_value == solid_value or (down_tile_land_value == exit_value and not stairs_exitable_question(brane_state)):
+            if down_tile_land_value == pit_value or down_tile_land_value == white_value or (down_tile_land_value == exit_value and not stairs_exitable_question(brane_state)):
                 choices.add("D")
-            if left_tile_land_value == pit_value or left_tile_land_value == solid_value or (left_tile_land_value == exit_value and not stairs_exitable_question(brane_state)):
+            if left_tile_land_value == pit_value or left_tile_land_value == white_value or (left_tile_land_value == exit_value and not stairs_exitable_question(brane_state)):
                 choices.add("L")
-            if up_tile_land_value == pit_value or up_tile_land_value == solid_value or (up_tile_land_value == exit_value and not stairs_exitable_question(brane_state)):
+            if up_tile_land_value == pit_value or up_tile_land_value == white_value or (up_tile_land_value == exit_value and not stairs_exitable_question(brane_state)):
                 choices.add("U")
-            if right_tile_land_value == pit_value or right_tile_land_value == solid_value or (right_tile_land_value == exit_value and not stairs_exitable_question(brane_state)):
+            if right_tile_land_value == pit_value or right_tile_land_value == white_value or (right_tile_land_value == exit_value and not stairs_exitable_question(brane_state)):
                 choices.add("R")
     
     stupid_horse = []
@@ -791,7 +798,7 @@ def safe_choice_list(brane_state: list[int], stupid_flaggot: bool = False):
     
     ## PREDESTINATION MODE ##
     if not stupid_flaggot and predestination_mode:
-        predestined_choice = known_solutions[chosen_brane+"+"+chosen_brand][len(working_moves)]
+        predestined_choice = known_solutions[combo_name()][len(working_moves)]
         
         if predestined_choice not in choices:
             print("Choices would've been: "+str(stupid_horse))
@@ -804,84 +811,84 @@ def safe_choice_list(brane_state: list[int], stupid_flaggot: bool = False):
     return stupid_horse
 
 ## The dictionaries! ##
-player_down_solid = create_tile_data(1, 1, solid_value)
+player_down_solid = create_tile_data(1, 1, white_value)
 player_down_glass = create_tile_data(1, 1, glass_value)
 
 mimic_down_glass = create_tile_data(mimic_entity_type, 1, glass_value)
 
 rockless_button = create_tile_data(0, 0, button_value)
-rock_on_land = create_tile_data(rock_entity_type, rock_present_value, solid_value)
+rock_on_land = create_tile_data(rock_entity_type, rock_present_value, white_value)
 hand_on_glass = create_tile_data(rock_entity_type, hands_present_value, glass_value)
 rock_on_glass = create_tile_data(rock_entity_type, rock_present_value, glass_value)
 
 brane_dicts = {
     "add": [
-        solid_value, pit_value, pit_value, exit_value, pit_value, solid_value,
-        pit_value, pit_value, pit_value, solid_value, solid_value, pit_value,
-        pit_value, solid_value, solid_value, solid_value, solid_value, solid_value,
-        solid_value, solid_value, player_down_solid, solid_value, solid_value, pit_value,
-        pit_value, solid_value, solid_value, pit_value, pit_value, pit_value,
-        solid_value, pit_value, pit_value, pit_value, pit_value, solid_value,
+        white_value, pit_value, pit_value, exit_value, pit_value, white_value,
+        pit_value, pit_value, pit_value, white_value, white_value, pit_value,
+        pit_value, white_value, white_value, white_value, white_value, white_value,
+        white_value, white_value, player_down_solid, white_value, white_value, pit_value,
+        pit_value, white_value, white_value, pit_value, pit_value, pit_value,
+        white_value, pit_value, pit_value, pit_value, pit_value, white_value,
     ],
     "eus": [
         glass_value, glass_value, glass_value, glass_value, glass_value, glass_value,
-        glass_value, glass_value, player_down_solid, solid_value, glass_value, glass_value,
-        glass_value, glass_value, solid_value, glass_value, glass_value, glass_value,
+        glass_value, glass_value, player_down_solid, white_value, glass_value, glass_value,
+        glass_value, glass_value, white_value, glass_value, glass_value, glass_value,
         glass_value, glass_value, glass_value, glass_value, glass_value, glass_value,
         glass_value, glass_value, glass_value, pit_value, glass_value, glass_value,
         glass_value, glass_value, glass_value, exit_value, glass_value, wall_value,
     ],
     ## Beaver not yet impleme... bee. BEEver. Oh my god I just got that.
     "bee": [
-        pit_value, pit_value, solid_value, solid_value, solid_value, pit_value,
-        pit_value, solid_value, solid_value, pit_value, solid_value, solid_value,
-        pit_value, solid_value, pit_value, pit_value, pit_value, solid_value,
-        pit_value, create_tile_data(beaver_entity_type, 1, exit_value), pit_value, player_down_solid, solid_value, pit_value,
-        solid_value, pit_value, pit_value, pit_value, solid_value, solid_value,
-        wall_value, solid_value, solid_value, solid_value, solid_value, pit_value,
+        pit_value, pit_value, white_value, white_value, white_value, pit_value,
+        pit_value, white_value, white_value, pit_value, white_value, white_value,
+        pit_value, white_value, pit_value, pit_value, pit_value, white_value,
+        pit_value, create_tile_data(beaver_entity_type, 1, exit_value), pit_value, player_down_solid, white_value, pit_value,
+        white_value, pit_value, pit_value, pit_value, white_value, white_value,
+        wall_value, white_value, white_value, white_value, white_value, pit_value,
     ],
     ## Buttons are irrelevant for this SHIT WAIT NO THEY'RE NOT IF THE STAIRS ARE INACTIVE.,..,
     ## Corner rocks are treated as walls because that's what they are.
     "mon": [
-        rockless_button, solid_value, solid_value, solid_value, solid_value, wall_value,
-        solid_value, glass_value, glass_value, glass_value, glass_value, solid_value,
-        solid_value, glass_value, solid_value, glass_value, glass_value, solid_value,
-        solid_value, glass_value, glass_value, player_down_solid, glass_value, solid_value,
-        solid_value, glass_value, glass_value, glass_value, rock_on_glass, solid_value,
-        wall_value, solid_value, solid_value, solid_value, solid_value, exit_value,
+        rockless_button, white_value, white_value, white_value, white_value, wall_value,
+        white_value, glass_value, glass_value, glass_value, glass_value, white_value,
+        white_value, glass_value, white_value, glass_value, glass_value, white_value,
+        white_value, glass_value, glass_value, player_down_solid, glass_value, white_value,
+        white_value, glass_value, glass_value, glass_value, rock_on_glass, white_value,
+        wall_value, white_value, white_value, white_value, white_value, exit_value,
     ],
     ## This is spaghetti
     "tan": [
-        rock_on_land, hand_on_glass, player_down_solid, solid_value, hand_on_glass, rock_on_land,
-        hand_on_glass, hand_on_glass, solid_value, solid_value, hand_on_glass, hand_on_glass,
+        rock_on_land, hand_on_glass, player_down_solid, white_value, hand_on_glass, rock_on_land,
+        hand_on_glass, hand_on_glass, white_value, white_value, hand_on_glass, hand_on_glass,
         rock_on_land, hand_on_glass, rock_on_land, rock_on_land, hand_on_glass, rock_on_land,
-        solid_value, solid_value, exit_value, hand_on_glass, solid_value, solid_value,
-        solid_value, hand_on_glass, rock_on_land, solid_value, hand_on_glass, solid_value,
-        solid_value, solid_value, hand_on_glass, hand_on_glass, solid_value, solid_value,
+        white_value, white_value, exit_value, hand_on_glass, white_value, white_value,
+        white_value, hand_on_glass, rock_on_land, white_value, hand_on_glass, white_value,
+        white_value, white_value, hand_on_glass, hand_on_glass, white_value, white_value,
     ],
     "gor": [
-        mimic_down_glass, glass_value, solid_value, solid_value, glass_value, glass_value,
-        glass_value, glass_value, solid_value, solid_value, glass_value, glass_value,
-        glass_value, glass_value, glass_value, glass_value, glass_value, solid_value,
-        solid_value, glass_value, glass_value, glass_value, glass_value, rock_on_land,
-        glass_value, glass_value, solid_value, solid_value, glass_value, glass_value,
-        wall_value, glass_value, solid_value, solid_value, glass_value, exit_value,
+        mimic_down_glass, glass_value, white_value, white_value, glass_value, player_down_glass,
+        glass_value, glass_value, white_value, white_value, glass_value, glass_value,
+        glass_value, glass_value, glass_value, glass_value, glass_value, white_value,
+        white_value, glass_value, glass_value, glass_value, glass_value, rock_on_land,
+        glass_value, glass_value, white_value, white_value, glass_value, glass_value,
+        wall_value, glass_value, white_value, white_value, glass_value, exit_value,
     ],
     "lev": [
-        wall_value, chain_inactive_value, chain_inactive_value, exit_value, solid_value, player_down_solid,
-        chain_inactive_value, chain_inactive_value, solid_value, solid_value, solid_value, solid_value,
-        solid_value, chain_inactive_value, chain_inactive_value, rock_on_land, chain_inactive_value, chain_inactive_value,
-        chain_inactive_value, chain_inactive_value, solid_value, solid_value, chain_inactive_value, chain_inactive_value,
-        chain_inactive_value, chain_inactive_value, chain_inactive_value, chain_inactive_value, chain_inactive_value, solid_value,
-        wall_value, solid_value, chain_inactive_value, chain_inactive_value, solid_value, solid_value
+        wall_value, chain_inactive_value, chain_inactive_value, exit_value, white_value, player_down_solid,
+        chain_inactive_value, chain_inactive_value, white_value, white_value, white_value, white_value,
+        white_value, chain_inactive_value, chain_inactive_value, rock_on_land, chain_inactive_value, chain_inactive_value,
+        chain_inactive_value, chain_inactive_value, white_value, white_value, chain_inactive_value, chain_inactive_value,
+        chain_inactive_value, chain_inactive_value, chain_inactive_value, chain_inactive_value, chain_inactive_value, white_value,
+        wall_value, white_value, chain_inactive_value, chain_inactive_value, white_value, white_value
     ],
     "cif": [
-        wall_value, solid_value, pit_value, pit_value, pit_value, wall_value,
-        pit_value, solid_value, pit_value, solid_value, pit_value, solid_value,
-        pit_value, solid_value, pit_value, pit_value, solid_value, pit_value,
-        solid_value, pit_value, solid_value, pit_value, pit_value, pit_value,
-        solid_value, pit_value, pit_value, player_down_solid, pit_value, pit_value,
-        wall_value, solid_value, pit_value, pit_value, pit_value, wall_value,
+        wall_value, white_value, pit_value, pit_value, pit_value, wall_value,
+        pit_value, white_value, pit_value, white_value, pit_value, white_value,
+        pit_value, white_value, pit_value, pit_value, white_value, pit_value,
+        white_value, pit_value, white_value, pit_value, pit_value, pit_value,
+        white_value, pit_value, pit_value, player_down_solid, pit_value, pit_value,
+        wall_value, white_value, pit_value, pit_value, pit_value, wall_value,
     ],
     #dis
 }
@@ -981,6 +988,9 @@ brand_dicts = {
 
 #######
 
+def combo_name():
+    return chosen_brane+"+"+chosen_brand
+
 # This should be where our focus is.
 unproven_solutions = {
     "eus+add",
@@ -998,6 +1008,7 @@ known_solutions = {
     "eus+eus": "LZRURDRLLRZRZLLRZRDLZDZDZLDR",
     "eus+lev": "LZURRDLZLRZDDUUDZDDZURUZLDUZDZDLZRZULZRUZDZULRZRRZLLRZRLZUDZDRZLUZDDZRU",
     "eus+cif": "LZRRLZDLZRRLZUUDZRUDZDZUZRLZDZRZLZDUZDZDZRRUZLLUDZUZUZDDLRZUUDZUZURLDDUZDZDUZDZDLZRUUZDDUZDZDLRZUUZDZURLZLLRZURZRZ",
+    # Sum[Divide[\(40)35+1\(41)!,\(40)\(40)2+b\(41)! * 3! * \(40)30-b\(41)! * 1!\(41)]* \(40)3+30-b\(41) * 4,{b,0,33-15}]
     
     "mon+eus": "UUZLDDUZUZLRZRRZLLDZDDDRRZLUULUURLZLZDLDDRDRRRZLZRRUUULZLZDZDZUUULLUDZRRDZULLDLRZRZLDZLURZUDZDUZ",
 }
@@ -1031,6 +1042,8 @@ move_thresholds = []
 moving_loops = 0
 #failed_loops_distance = {}
 steps_since_last_glass = 0
+steps_since_last_bump = 0
+steps_since_last_chain = 0
 trimmings = []
 working_moves = ""
 
@@ -1086,7 +1099,7 @@ while True:
         continue
     
     # Resets this as irrelevant.
-    if predestination_mode and not (chosen_brane+"+"+chosen_brand in known_solutions):
+    if predestination_mode and not (combo_name() in known_solutions):
         print("Brane/brand combination not in solution list, disabling predestination mode.")
         predestination_mode = False
     
@@ -1095,6 +1108,26 @@ while True:
     bad_solutions.clear()
     bad_solutions_distance.clear()
     weirdo_flag = False
+    
+    cache_location = "bad_solutions/"+combo_name()+".txt"
+    # Attempt to read the cache.
+    try:
+        with open(cache_location, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+            
+            if len(lines) == 0:
+                pass
+            elif len(lines) % 2 != 0:
+                error = input("Cache is fucked the hell up.")
+            else:
+                for i in range(len(lines)):
+                    if i % 2 == 0:
+                        bad_solutions.append(lines[i].strip())
+                    else:
+                        bad_solutions_distance.append(int(lines[i].strip()))
+    except FileNotFoundError:
+        print("No cache found.")
+    
     while True:
         # Iteration
         solution_loop_counter += 1
@@ -1109,14 +1142,31 @@ while True:
         #failed_loops_distance.clear()
         steps_since_last_glass = 0
         steps_since_last_bump = 0
+        steps_since_last_chain = 0
         trimmings.clear()
         
         if working_moves != "":
-            if len(bad_solutions) > 0 and working_moves == bad_solutions[-1]:
-                print("Solution finder has generated the exact same (wrong) sequence of inputs twice in a row. This nearly-certainly implies a bug.")
-            bad_solutions.append(working_moves)
-            bad_solutions_distance.append(distance_from_heaven(current_brane_layout,brand_dicts[chosen_brand]))
+            #if len(bad_solutions) > 0 and working_moves == bad_solutions[-1]:
+            #    print("Solution finder has generated the exact same (wrong) sequence of inputs twice in a row. This nearly-certainly implies a bug.")
             
+            # Check for duplicates.
+            if working_moves not in bad_solutions:
+                bad_solutions.append(working_moves)
+                print("Calculating distance from Heaven...")
+                bad_solutions_distance.append(distance_from_heaven(current_brane_layout,brand_dicts[chosen_brand]))
+                print("Calculated distance from Heaven.")
+            
+            # Writing to cache.
+            with open(cache_location, "w", encoding="utf-8") as f:
+                if len(bad_solutions) != len(bad_solutions_distance):
+                    error = input("Bad solutions arrays not same length fuck it all burn it down")
+                
+                for i in range(len(bad_solutions) + len(bad_solutions_distance)):
+                    if i % 2 == 0:
+                        f.write(bad_solutions[int(i/2)]+"\n")
+                    else:
+                        f.write(str(bad_solutions_distance[int(i/2)])+"\n")
+                    
             # I SPENT 1 AND A HALF HOURS TRYING TO FIGURE OUT WHY ASSIGNMENTS WEREN'T WORKING BECAUSE APPARENTLY WHEN YOU ASSIGN THE VARIABLE AS THE KEY, CHANGING THE VARIABLE CHANGES THE KEY AND ASSIGNING AGAIN JUST OVERRIDES WHAT WAS THERE INSTEAD OF JUST LOGGING IT AS THE NEW VALUE. I HATE DATA DICTIONARIES IN PYTHON. HATE. HATE. HATE. LET ME TE
             #failed_loops_distance[bad_solutions[-1]] = distance_from_heaven(current_brane_layout,brand_dicts[chosen_brand])
             
@@ -1146,18 +1196,27 @@ while True:
             
             ## Special failure states
             def special_failure_states(brane_state):
-                # Glass can't be broken...
+                print("Checking special failures.")
+                # Breakables can't be broken...
                 if count_valids(brane_state)+held_valids() == count_valids(brand_dicts[chosen_brand]):
-                    # The brand isn't carved...
-                    if not is_brand_carved(brane_state,brand_dicts[chosen_brane]):
-                        # No wings...
-                        if not wings:
-                            # Not holding a solid tile...
-                            if not (1 in held_tiles) and not (not stairs_exitable_question(brane_state) and (2 in held_tiles)):
-                                # There exists no 3-line for the player to traverse with.
-                                if not three_line_present_strict(brane_state):
-                                    print("Unrecoverable situation: no 3 line and glass can't be broken.")
-                                    return True
+                    # No chain tiles.
+                    flag = False
+                    for i in range(36):
+                        if get_land_value_from_tile(brane_state[i]) == chain_inactive_value:
+                            flag = True
+                            break
+                    
+                    if not flag:
+                        # The brand isn't carved...
+                        if not is_brand_carved(brane_state,brand_dicts[chosen_brane]):
+                            # No wings...
+                            if not wings:
+                                # Not holding a solid tile...
+                                if not (1 in held_tiles) and not (not stairs_exitable_question(brane_state) and (2 in held_tiles)):
+                                    # There exists no 3-line for the player to traverse with.
+                                    if not three_line_present_strict(brane_state):
+                                        print("Unrecoverable situation: no 3 line and glass can't be broken.")
+                                        return True
                 
                 # Cornered
                 # Not floating...
@@ -1181,8 +1240,13 @@ while True:
             if not here_be_monsters_question(brane_dicts[chosen_brane]):
                 print("Trimming down repetitive movements...")
                 
+                # High-level theft of a Nintendo console.
+                # ...It's just shorthand for some counters.
+                def gbc_gt(x):
+                    return steps_since_last_glass > x and steps_since_last_bump > x and steps_since_last_chain > x
+                
                 # Pickup, turn 180 degrees, and place right where it was before.
-                if steps_since_last_bump > 5 and steps_since_last_glass > 5 and len(working_moves) >= 5 and working_moves[-5] == working_moves[-2] and working_moves[-4] == "Z" and working_moves[-3] == opposite_direction(working_moves[-2]) and working_moves[-1] == "Z":
+                if len(working_moves) >= 5 and gbc_gt(5) and working_moves[-5] == working_moves[-2] and working_moves[-4] == "Z" and working_moves[-3] == opposite_direction(working_moves[-2]) and working_moves[-1] == "Z":
                     if len(trimmings) > 2 and trimmings[-1] == trimmings[-2] and trimmings[-1] == [working_moves[-4],working_moves[-3],working_moves[-2],working_moves[-1]]:
                         print("Error! Trimming same sequence thrice in a row, likely infinite loop!")
                         death_flag = True
@@ -1195,7 +1259,7 @@ while True:
                     
                     working_moves = working_moves[:-4]
                 # Start facing a direction, go opposite, then go right back to facing the same way.
-                if steps_since_last_bump > 3 and steps_since_last_glass > 3 and len(working_moves) >= 3 and working_moves[-1] == working_moves[-3] and working_moves[-2] == opposite_direction(working_moves[-1]):
+                if len(working_moves) >= 3 and gbc_gt(3) and working_moves[-1] == working_moves[-3] and working_moves[-2] == opposite_direction(working_moves[-1]):
                     if len(trimmings) > 2 and trimmings[-1] == trimmings[-2] and trimmings[-1] == [working_moves[-2],working_moves[-1]]:
                         print("Error! Trimming same sequence thrice in a row, likely infinite loop!")
                         death_flag = True
@@ -1208,7 +1272,7 @@ while True:
                     
                     working_moves = working_moves[:-2]     
                 # spin in a dizziful bliss
-                if steps_since_last_bump > 5 and steps_since_last_glass > 5 and len(working_moves) >= 5:
+                if len(working_moves) >= 5 and gbc_gt(5):
                     store = [working_moves[-5],working_moves[-4],working_moves[-3],working_moves[-2],working_moves[-1]]
                     loops = [
                         # guys stop spinning clockwise
@@ -1237,7 +1301,7 @@ while True:
                         
                         working_moves = working_moves[:-4]
                 # Short stupids
-                if steps_since_last_bump > 3 and steps_since_last_glass > 3 and len(working_moves) >= 3:
+                if len(working_moves) >= 3 and gbc_gt(3):
                     store = [working_moves[-3],working_moves[-2],working_moves[-1]]
                     loops = [
                         # Some Add/Add solutions do this.
@@ -1259,10 +1323,10 @@ while True:
                         trimmings.append(list(store))
                         
                         working_moves = working_moves[:-3]
-                        working_moves.append(store[-1])
+                        working_moves += (store[-1])
             
             too_long = False
-            if chosen_brane+"+"+chosen_brand in known_solutions and len(working_moves) > 2*len(known_solutions[chosen_brane+"+"+chosen_brand]):
+            if combo_name() in known_solutions and len(working_moves) > len(known_solutions[combo_name()]):
                 print("Working moves too long. Resetting...")
                 death_flag = True
                 too_long = True
@@ -1290,7 +1354,7 @@ while True:
                     print(display_brane(current_brane_layout))
                     error = input("")
 
-            ## Update glass counter.
+            ## Update glass & chain counter.
             player_index = get_player_index(current_brane_layout)
             player_land_data = get_land_value_from_tile(current_brane_layout[player_index])
             
@@ -1298,6 +1362,11 @@ while True:
                 steps_since_last_glass = 0
             else:
                 steps_since_last_glass += 1
+                
+            if (player_land_data == chain_inactive_value or player_land_data == chain_active_value):
+                steps_since_last_chain = 0
+            else:
+                steps_since_last_chain += 1
 
             ## Check for safe choices.
             safe_choices = safe_choice_list(current_brane_layout)
@@ -1484,7 +1553,7 @@ while True:
                         if rock_destination_land_value == pit_value:
                             pass
                         # Moving onto a white tile, glass, or stairs.
-                        elif rock_destination_land_value == solid_value or rock_destination_land_value == glass_value or rock_destination_land_value == exit_value:
+                        elif rock_destination_land_value == white_value or rock_destination_land_value == glass_value or rock_destination_land_value == exit_value:
                             current_brane_layout[rock_destination_index] = create_tile_data(rock_entity_type, rock_present_value, rock_destination_land_value)
                         # Moving onto an inactive chain tile.
                         elif rock_destination_land_value == chain_inactive_value:
@@ -1496,9 +1565,11 @@ while True:
                         else:
                             error = input("Error! Cannot resolve world state!1 " + current_move)
                 else:
-                    # Update glass counter.
+                    # Update glass and chain counters.
                     if (moving_land_data == glass_value):
                         steps_since_last_glass = 0
+                    elif (moving_land_data == chain_inactive_value or moving_land_data == chain_active_value):
+                        steps_since_last_chain = 0
 
                     # Tile we're moving into is a pit. (Or an active chain, which is similar.)
                     if moving_land_data == pit_value or moving_land_data == chain_active_value:
@@ -1540,7 +1611,7 @@ while True:
                                 error = input("5moving_tile_index == -1 and was attempted to be used as an index")
                             current_brane_layout[moving_tile_index] = create_tile_data(1, direction_letter_to_number(current_move), 0)
                     # Tile is a solid tile, glass, chain, or walkable stairs.
-                    elif moving_land_data == solid_value or moving_land_data == glass_value or moving_land_data == chain_inactive_value or (moving_land_data == exit_value and not stairs_exitable_question(current_brane_layout)):
+                    elif moving_land_data == white_value or moving_land_data == glass_value or moving_land_data == chain_inactive_value or (moving_land_data == exit_value and not stairs_exitable_question(current_brane_layout)):
                         steps_since_last_bump += 1
                         
                         # Remove player from source tile
