@@ -25,7 +25,7 @@ except:
 ## Prints a brand in a readable way.
 def display_brane(brane: list[int]):
     if len(brane) != 36:
-        error = input("Error! Brane with invalid length: " + str(len(brane)))
+        raise ValueError("Error! Brane with invalid length: " + str(len(brane)))
 
     string = ""
     for i in range(36):
@@ -110,7 +110,7 @@ wall_value = 0b111
 
 def create_tile_data(entity_type: int, entity_value: int, land: int):
     if entity_type > base_value-1 or entity_value > base_value-1 or land > base_value-1 or entity_type < 0 or entity_value < 0 or land < 0:
-        error = input("Error! Invalid inputs in create_tile_data()! " + str(player) + " " + str(land))
+        raise ValueError("Error! Invalid inputs in create_tile_data()! " + str(player) + " " + str(land))
 
     # New data structure:
     # 3rd slot - entity type (unspecified, player, beaver, mimic, rock/hand)
@@ -166,10 +166,10 @@ def is_brand_carved(brane_state: list[int], brand: list[int]):
     ## First, validate the inputs to avoid any dumb mistakes.
     for i in range(36):
         if brane_state[i] < 0 or brane_state[i] > create_tile_data(base_value-1, base_value-1, base_value-1):
-            error = input("Error! Invalid brane_state input in is_brand_carved()! " + display_brane(brane_state))
+            raise ValueError("Error! Invalid brane_state input in is_brand_carved()! " + display_brane(brane_state))
 
         if brand[i] != 0 and brand[i] != 1:
-            error = input("Error! Invalid brand input in is_brand_carved! " + str(brand))
+            raise ValueError("Error! Invalid brand input in is_brand_carved! " + str(brand))
 
     ## Now, check in earnest.
     for i in range(36):
@@ -187,10 +187,10 @@ def is_brand_carved_minus_stairs(brane_state: list[int], brand: list[int]):
     ## First, validate the inputs to avoid any dumb mistakes.
     for i in range(36):
         if brane_state[i] < 0 or brane_state[i] > create_tile_data(base_value-1, base_value-1, base_value-1):
-            error = input("Error! Invalid brane_state input in is_brand_carved()! " + display_brane(brane_state))
+            raise ValueError("Error! Invalid brane_state input in is_brand_carved()! " + display_brane(brane_state))
 
         if brand[i] != 0 and brand[i] != 1:
-            error = input("Error! Invalid brand input in is_brand_carved! " + str(brand))
+            raise ValueError("Error! Invalid brand input in is_brand_carved! " + str(brand))
 
     ## Now, check in earnest.
     for i in range(36):
@@ -208,10 +208,10 @@ def is_brand_carved_minus_stood_glass(brane_state: list[int], brand: list[int]):
     ## First, validate the inputs to avoid any dumb mistakes.
     for i in range(36):
         if brane_state[i] < 0 or brane_state[i] > create_tile_data(base_value-1, base_value-1, base_value-1):
-            error = input("Error! Invalid brane_state input in is_brand_carved()! " + display_brane(brane_state))
+            raise ValueError("Error! Invalid brane_state input in is_brand_carved()! " + display_brane(brane_state))
 
         if brand[i] != 0 and brand[i] != 1:
-            error = input("Error! Invalid brand input in is_brand_carved! " + str(brand))
+            raise ValueError("Error! Invalid brand input in is_brand_carved! " + str(brand))
 
     ## Now, check in earnest.
     for i in range(36):
@@ -232,14 +232,14 @@ def get_player_index(brane_state: list[int], handling_absent_case = False):
     for i in range(36):
         if get_entity_type_from_tile(brane_state[i]) == player_entity_type:
             if store != -1:
-                error = input("Error! Multiple players found by get_player_index()\n"+ display_brane(brane_state))
+                raise ValueError("Error! Multiple players found by get_player_index()\n"+ display_brane(brane_state))
 
             store = i
 
     if store != -1 or handling_absent_case:
         return store
 
-    error = input("Error! Player could not be found by get_player_index()!\n"+ display_brane(brane_state))
+    raise ValueError("Error! Player could not be found by get_player_index()!\n"+ display_brane(brane_state))
 
 ## Given a brane state, returns the index of the stairs.
 def get_stairs_index(brane_state: list[int]):
@@ -247,14 +247,14 @@ def get_stairs_index(brane_state: list[int]):
     for i in range(36):
         if get_land_value_from_tile(brane_state[i]) == exit_value:
             if store != -1:
-                error = input("Error! Multiple stairs found by get_stairs_index()!\n"+ display_brane(brane_state))
+                raise ValueError("Error! Multiple stairs found by get_stairs_index()!\n"+ display_brane(brane_state))
 
             store = i
 
     if store != -1:
         return store
 
-    error = input("Error! Stairs could not be found by get_stairs_index()!\n"+ display_brane(brane_state))
+    raise ValueError("Error! Stairs could not be found by get_stairs_index()!\n"+ display_brane(brane_state))
 
 ## Given a brane state, returns the land value of the tile the player is standing on.
 def get_player_land_value(brane_state: list[int]):
@@ -279,7 +279,7 @@ def direction_letter_to_number(letter : str):
     elif letter == "R":
         return 4
     else:
-        error = input("Error! No valid number equivalent for letter input in direction_letter_to_number()! " + letter)
+        raise ValueError("Error! No valid number equivalent for letter input in direction_letter_to_number()! " + letter)
 
 ## Gives the tile INDEX of the tile in front of the player. Don't call this directly unless handling -1 case.
 ## Direction provided can be either integer or letter.
@@ -289,7 +289,7 @@ def index_tile_in_direction_of_player(brane_state: list[int], player_direction=-
         player_direction = get_player_value_from_tile(brane_state[player_i])
 
     if player_direction == 0:
-        error = input("Error! Player does not exist to index_tile_in_front_of_player()!")
+        raise ValueError("Error! Player does not exist to index_tile_in_front_of_player()!")
     elif player_direction == 1 or player_direction == "D":  # down
         if player_i + 6 > 35:
             return -1
@@ -311,7 +311,7 @@ def index_tile_in_direction_of_player(brane_state: list[int], player_direction=-
         else:
             return player_i + 1
     else:
-        error = input("Error! Player does not have valid direction to index_tile_in_direction_of_player()! "+brane_state)
+        raise ValueError("Error! Player does not have valid direction to index_tile_in_direction_of_player()! "+brane_state)
 
 ## Same as the above but returns the actual data in one step.
 def tile_in_direction_of_player(brane_state: list[int], forced_direction=-1):
@@ -383,7 +383,7 @@ def brane_has_stairs_question(brane_state: list[int]):
 ## Counts brand-valid tiles.
 def count_valids(brane_state: list[int]):
     if len(brane_state) != 36:
-        error = input("Error! Brane with invalid length: " + str(len(brane_state)))
+        raise ValueError("Error! Brane with invalid length: " + str(len(brane_state)))
 
     counter = 0
     for i in range(36):
@@ -394,7 +394,7 @@ def count_valids(brane_state: list[int]):
 ## Counts state-1 tiles.
 def count_state_1s(brane_state: list[int]):
     if len(brane_state) != 36:
-        error = input("Error! Brane with invalid length: " + str(len(brane_state)))
+        raise ValueError("Error! Brane with invalid length: " + str(len(brane_state)))
 
     counter = 0
     for i in range(36):
@@ -405,7 +405,7 @@ def count_state_1s(brane_state: list[int]):
 ## Checks if the stairs are active (i.e., available to exit from)
 def stairs_exitable_question(brane_state: list[int]):
     if len(brane_state) != 36:
-        error = input("Error! Brane with invalid length: " + str(len(brane_state)))
+        raise ValueError("Error! Brane with invalid length: " + str(len(brane_state)))
 
     # Check the rod first.
     if exit_value in held_tiles:
@@ -646,7 +646,7 @@ def trigger_chain_disperse(brane_state: list[int], i: int):
         for triggered_i in triggered_tiles:
             # Confirm land.
             if get_land_value_from_tile(brane_state[triggered_i]) != chain_active_value:
-                error = input("triggered_i isn't an active chain: "+str(triggered_i)+" "+str(triggered_tiles))
+                raise ValueError("triggered_i isn't an active chain: "+str(triggered_i)+" "+str(triggered_tiles))
                 
             # Check each direction.
             if triggered_i-1 >= 0 and triggered_i-1 not in triggered_tiles and get_land_value_from_tile(brane_state[triggered_i-1]) == chain_active_value:
@@ -832,7 +832,7 @@ def safe_choice_list(brane_state: list[int], stupid_flaggot: bool = False):
         
         if predestined_choice not in choices:
             print("Choices would've been: "+str(stupid_horse))
-            error = input("Predestined choice was removed by choices algorithm. Something needs to be changed.")
+            raise ValueError("Predestined choice was removed by choices algorithm. Something needs to be changed.")
         
         print("Choices would've been: "+str(stupid_horse))
         
@@ -893,8 +893,10 @@ def random_brane():
     max_whites = max(add_whites,eus_whites,bee_whites,mon_whites,tan_whites,gor_whites,lev_whites,cif_whites)
     placed_whites = 0
     
-    max_glass = 30
+    max_glass = max(add_glass,eus_glass,bee_glass,mon_glass,tan_glass,gor_glass,lev_glass,cif_glass)
     placed_glass = 0
+    
+    max_whites_in_glass = max(eus_whites,mon_whites,gor_whites) # The maximum amount of white tiles out of all the branes that have glass.
     
     max_chains = 19
     placed_chains = 0
@@ -955,48 +957,48 @@ def random_brane():
             if placed_whites == max_whites:
                 valid_lands.remove(white_value)
             elif placed_whites > max_whites:
-                error = input("Random brane: max whites exceeded: "+str(placed_whites)+"/"+str(max_whites))
+                raise ValueError("Random brane: max whites exceeded: "+str(placed_whites)+"/"+str(max_whites))
                 valid_lands.remove(white_value)
                 
             # The maximum of all brand rooms with glass
-            if placed_whites >= max(eus_whites,mon_whites,gor_whites) and placed_glass > 0:
+            if placed_glass > 0 and placed_whites >= max_whites_in_glass:
                 # We're exactly at the limit.
-                if placed_whites == max(eus_whites,mon_whites,gor_whites) and white_value in valid_lands:
+                if placed_whites == max_whites_in_glass and white_value in valid_lands:
                     valid_lands.remove(white_value)
                 # Above the limit.
                 else:
-                    error = input("Random brane: brane has glass, but more white tiles placed than is valid for branes with glass.")
+                    raise ValueError("Random brane: brane has glass, but more white tiles placed than is valid for branes with glass.")
             # No glass has been placed, and placing any would result in an invalid state.
-            elif placed_glass == 0 and placed_whites > max(eus_whites,mon_whites,gor_whites) and glass_value in valid_lands:
+            elif placed_glass == 0 and placed_whites > max_whites_in_glass and glass_value in valid_lands:
                 valid_lands.remove(glass_value)
                 
             # Excess whites means we can't be in Bee's room
             if placed_whites > bee_whites:
                 if room_monster == "beaver":
-                    error = input("Random brane: beaver present but more whites than Bee's room.")
+                    raise ValueError("Random brane: beaver present but more whites than Bee's room.")
                 elif beaver_entity_type in valid_entities:
                     valid_entities.remove(beaver_entity_type)
             # Excess whites means we can't be in Mon's room
             if placed_whites > mon_whites:
                 if placed_buttons > 0:
-                    error = input("Random brane: have a button (in Mon's room) have more whites than his room has.")
+                    raise ValueError("Random brane: have a button (in Mon's room) have more whites than his room has.")
                 elif button_value in valid_lands:
                     valid_lands.remove(button_value)
             # Excess whites means we can't be in Gor's room
             if placed_whites > gor_whites:
                 if room_monster == "mimic":
-                    error = input("Random brane: mimic present but more whites than Gor's room.")
+                    raise ValueError("Random brane: mimic present but more whites than Gor's room.")
                 elif mimic_entity_type in valid_entities:
                     valid_entities.remove(mimic_entity_type)
             # Excess whites means we can't be in Lev's room
             if placed_whites >= lev_whites:
                 if placed_chains > 0:
                     if placed_whites > lev_whites:
-                        error = input("Error, chains are placed but there are more white tiles than Lev's room.")
+                        raise ValueError("Error, chains are placed but there are more white tiles than Lev's room.")
                     valid_lands.remove(white_value)
                 else:
                     if (chain_inactive_value in valid_lands)^(chain_active_value in valid_lands):
-                        error = input("Random brane: chain lands aren't both eliminated or both present")
+                        raise ValueError("Random brane: chain lands aren't both eliminated or both present")
                     elif chain_inactive_value in valid_lands:
                         valid_lands.remove(chain_inactive_value)
                         valid_lands.remove(chain_active_value)
@@ -1006,18 +1008,18 @@ def random_brane():
             if placed_glass == max_glass:
                 valid_lands.remove(glass_value)
             elif placed_glass > max_glass:
-                error = input("Random brane: max glass exceeded: "+str(placed_glass)+"/"+str(max_glass))
+                raise ValueError("Random brane: max glass exceeded: "+str(placed_glass)+"/"+str(max_glass))
                 valid_lands.remove(glass_value)
                 
             # The maximum of all brand rooms with glass
-            if placed_whites == max(eus_whites,mon_whites,gor_whites):
+            if placed_whites == max_whites_in_glass:
                 valid_lands.remove(placed_whites)
-            elif placed_whites >= max(eus_whites,mon_whites,gor_whites):
-                error = input("Random brane: brane has glass, but more white tiles placed than is valid for branes with glass.")
+            elif placed_whites >= max_whites_in_glass:
+                raise ValueError("Random brane: brane has glass, but more white tiles placed than is valid for branes with glass.")
             
             # Glass is incompatible with chains.
             if (chain_inactive_value in valid_lands)^(chain_active_value in valid_lands):
-                error = input("Random brane: chain lands aren't both eliminated or both present")
+                raise ValueError("Random brane: chain lands aren't both eliminated or both present")
             elif chain_inactive_value in valid_lands:
                 valid_lands.remove(chain_inactive_value)
                 valid_lands.remove(chain_active_value)
@@ -1029,20 +1031,19 @@ def random_brane():
             # Excess glass means we can't be in Bee's room
             if placed_glass > bee_glass:
                 if room_monster == "beaver":
-                    error = input("Random brane: beaver present but more glass than Bee's room.")
+                    raise ValueError("Random brane: beaver present but more glass than Bee's room.")
                 elif beaver_entity_type in valid_entities:
                     valid_entities.remove(beaver_entity_type)
             # Excess glass means we can't be in Mon's room
             if placed_glass > mon_glass:
                 if placed_buttons > 0:
-                    error = input("Random brane: have a button (in Mon's room) have more glass than his room has..")
-                
-                if button_value in valid_lands:
+                    raise ValueError("Random brane: have a button (in Mon's room) have more glass than his room has..")
+                elif button_value in valid_lands:
                     valid_lands.remove(button_value)
-            # Excess whites means we can't be in Gor's room
+            # Excess glass means we can't be in Gor's room
             if placed_glass > gor_glass:
                 if room_monster == "mimic":
-                    error = input("Random brane: mimic present but more glass than Gor's room.")
+                    raise ValueError("Random brane: mimic present but more glass than Gor's room.")
                 elif mimic_entity_type in valid_entities:
                     valid_entities.remove(mimic_entity_type)
         elif land == chain_inactive_value or land == chain_active_value:
@@ -1052,14 +1053,17 @@ def random_brane():
                 valid_lands.remove(chain_inactive_value)
                 valid_lands.remove(chain_active_value)
             elif placed_chains > max_chains:
-                error = input("Random brane: max chains exceeded.")
+                raise ValueError("Random brane: max chains exceeded.")
                 valid_lands.remove(chain_inactive_value)
                 valid_lands.remove(chain_active_value)
                 
-            # Chains are incompatible with these.
+            # Chains are incompatible with glass and buttons.
             if glass_value in valid_lands:
                 valid_lands.remove(glass_value)
+            if button_value in valid_lands:
+                valid_lands.remove(button_value)
             
+            # Chains are incompatible with beavers and mimics.
             if beaver_entity_type in valid_entities:
                 valid_entities.remove(beaver_entity_type)
             if mimic_entity_type in valid_entities:
@@ -1067,27 +1071,36 @@ def random_brane():
             
             # Presence of chains means no monsters
             if room_monster != "" and room_monster != "peaceful":
-                error = input("Random brane: trying to set peaceful but monsters already exist: "+room_monster)
+                raise ValueError("Random brane: trying to set peaceful but monsters already exist: "+room_monster)
             else:
                 room_monster = "peaceful"
+                
+            # Presence of chains sets maximum on whites.
+            if max_whites > lev_whites:
+                max_whites = lev_whites
         elif land == button_value:
-            # Only one button is allowed, and it's incompatible with these.
+            # Only one button is allowed.
             placed_buttons += 1
             valid_lands.remove(button_value)
             
+            # Buttons are incompatible with chains
             if (chain_inactive_value in valid_lands)^(chain_active_value in valid_lands):
-                error = input("Random brane: chain lands aren't both eliminated or both present")
+                raise ValueError("Random brane: chain lands aren't both eliminated or both present")
             elif chain_inactive_value in valid_lands:
                 valid_lands.remove(chain_inactive_value)
                 valid_lands.remove(chain_active_value)
             
+            # Buttons are incompatible with mimics and beavers
             if beaver_entity_type in valid_entities:
                 valid_entities.remove(beaver_entity_type)
             if mimic_entity_type in valid_entities:
                 valid_entities.remove(mimic_entity_type)
             
-            # Presence of button means no monsters
-            room_monster = "peaceful"
+            # Presence of buttons means no monsters
+            if room_monster != "" and room_monster != "peaceful":
+                raise ValueError("Random brane: trying to set peaceful but monsters already exist: "+room_monster)
+            else:
+                room_monster = "peaceful"
             
             # Presence of button sets maximums on whites and glasses
             if max_whites > mon_whites:
@@ -1096,6 +1109,12 @@ def random_brane():
                 max_glass = mon_glass
         elif land == exit_value:
             valid_lands.remove(exit_value)
+        
+        # Double-checks
+        if placed_whites == max_whites and white_value in valid_lands:
+            valid_lands.remove(white_value)
+        if placed_glass == max_glass and glass_value in valid_lands:
+            valid_lands.remove(glass_value)
         
         # Entity type
         entity_type = 0
@@ -1112,7 +1131,7 @@ def random_brane():
             # Only one beaver allowed.
             elif entity_type == beaver_entity_type:
                 if room_monster != "":
-                    error = input("Random brane error: attempted to place mimic on brane with the following room_monster: "+room_monster)
+                    raise ValueError("Random brane error: attempted to place mimic on brane with the following room_monster: "+room_monster)
                     
                 room_monster = "beaver"
                 valid_entities.remove(beaver_entity_type)
@@ -1123,16 +1142,16 @@ def random_brane():
                 
                 # Glass is incompatible with beaver.
                 if placed_glass > 0:
-                    error = input("Random brane error: attempted to place beaver on brane with glass.")
+                    raise ValueError("Random brane error: attempted to place beaver on brane with glass.")
                 else:
                     valid_lands.remove(glass_value)
                     
                 # Chains are incompatible with beaver.
                 if placed_chains > 0:
-                    error = input("Random brane error: attempted to place beaver on brane with chains.")
+                    raise ValueError("Random brane error: attempted to place beaver on brane with chains.")
                 else:
                     if (chain_inactive_value in valid_lands)^(chain_active_value in valid_lands):
-                        error = input("Random brane: chain lands aren't both eliminated or both present")
+                        raise ValueError("Random brane: chain lands aren't both eliminated or both present")
                     elif chain_inactive_value in valid_lands:
                         valid_lands.remove(chain_inactive_value)
                         valid_lands.remove(chain_active_value)
@@ -1147,7 +1166,7 @@ def random_brane():
             # Only one mimic allowed.
             elif entity_type == mimic_entity_type:
                 if room_monster != "":
-                    error = input("Random brane error: attempted to place mimic on brane with the following room_monster: "+room_monster)
+                    raise ValueError("Random brane error: attempted to place mimic on brane with the following room_monster: "+room_monster)
                 
                 room_monster = "mimic"
                 valid_entities.remove(mimic_entity_type)
@@ -1158,13 +1177,17 @@ def random_brane():
                 
                 # Chains are incompatible with mimics.
                 if placed_chains > 0:
-                    error = input("Random brane error: attempted to place beaver on brane with chains.")
+                    raise ValueError("Random brane error: attempted to place beaver on brane with chains.")
                 else:
                     if (chain_inactive_value in valid_lands)^(chain_active_value in valid_lands):
-                        error = input("Random brane: chain lands aren't both eliminated or both present")
+                        raise ValueError("Random brane: chain lands aren't both eliminated or both present")
                     elif chain_inactive_value in valid_lands:
                         valid_lands.remove(chain_inactive_value)
                         valid_lands.remove(chain_active_value)
+
+                # Buttons are incompatible with mimics.
+                if button_value in valid_lands:
+                    valid_lands.remove(button_value)
                         
                 # Presence of mimic sets maximums on whites and glasses.
                 if max_whites > gor_whites:
@@ -1178,7 +1201,7 @@ def random_brane():
                 if placed_rocks - placed_hands_hands == max_rocks:
                     valid_entities.remove(rock_entity_type)
                 elif placed_rocks - placed_hands_hands > max_rocks:
-                    error = input("Random brane: max rocks exceeded.")
+                    raise ValueError("Random brane: max rocks exceeded.")
                     valid_entities.remove(rock_entity_type)
                 
                 # B179 has only one rock.
@@ -1216,7 +1239,7 @@ def random_brane():
                     valid_entities.remove(mimic_entity_type)
                     
                 if (chain_inactive_value in valid_lands)^(chain_active_value in valid_lands):
-                    error = input("Random brane: chain lands aren't both eliminated or both present")
+                    raise ValueError("Random brane: chain lands aren't both eliminated or both present")
                 elif chain_inactive_value in valid_lands:
                     valid_lands.remove(chain_inactive_value)
                     valid_lands.remove(chain_active_value)
@@ -1835,7 +1858,7 @@ while True:
             if len(lines) == 0:
                 pass
             elif len(lines) % 2 != 0:
-                error = input("Cache is fucked the hell up.")
+                raise ValueError("Cache is fucked the hell up.")
             else:
                 # Read and filter
                 for i in range(len(lines)):
@@ -1883,7 +1906,7 @@ while True:
             # Writing to cache.
             with open(cache_location, "w", encoding="utf-8") as f:
                 if len(bad_solutions) != len(bad_solutions_distance):
-                    error = input("Bad solutions arrays not same length fuck it all burn it down")
+                    raise ValueError("Bad solutions arrays not same length fuck it all burn it down")
                 
                 for i in range(len(bad_solutions) + len(bad_solutions_distance)):
                     if i % 2 == 0:
@@ -1908,7 +1931,7 @@ while True:
             moving_loops += 1
             
             if not endless and len(held_tiles) > 1:
-                error = input("Endless Void Rod is not enabled but length of held_tiles array is > 1.")
+                raise ValueError("Endless Void Rod is not enabled but length of held_tiles array is > 1.")
             
             ## Did we do it?
             if is_brand_carved(current_brane_layout, brand_dicts[chosen_brand]):
@@ -1975,7 +1998,7 @@ while True:
                         death_flag = True
                         break
                     if predestination_mode:
-                        error = input("Trimming occurred in predestined choices.")
+                        raise ValueError("Trimming occurred in predestined choices.")
                     
                     last_trimmed = moving_loops
                     trimmings.append([working_moves[-4],working_moves[-3],working_moves[-2],working_moves[-1]])
@@ -1988,7 +2011,7 @@ while True:
                         death_flag = True
                         break
                     if predestination_mode:
-                        error = input("Trimming occurred in predestined choices.")
+                        raise ValueError("Trimming occurred in predestined choices.")
                     
                     last_trimmed = moving_loops
                     trimmings.append([working_moves[-2],working_moves[-1]])
@@ -2017,7 +2040,7 @@ while True:
                             death_flag = True
                             break
                         if predestination_mode:
-                            error = input("Trimming occurred in predestined choices.")
+                            raise ValueError("Trimming occurred in predestined choices.")
                             
                         last_trimmed = moving_loops
                         trimmings.append([working_moves[-4],working_moves[-3],working_moves[-2],working_moves[-1]])
@@ -2040,7 +2063,7 @@ while True:
                                 death_flag = True
                                 break
                         if predestination_mode:
-                            error = input("Trimming occurred in predestined choices.")
+                            raise ValueError("Trimming occurred in predestined choices.")
                             
                         last_trimmed = moving_loops
                         trimmings.append(list(store))
@@ -2080,7 +2103,7 @@ while True:
                     print(display_brane(brane_dicts[chosen_brane]))
                     print("Current state: ",current_solids + held_valids())
                     print(display_brane(current_brane_layout))
-                    error = input("")
+                    raise ValueError("")
 
             ## Check for safe choices.
             #print("penis cock balls penis!!")
@@ -2136,9 +2159,9 @@ while True:
                                     sub_odds *= non_predestined_thresholds[i % len(non_predestined)]
                         
                             if sub_odds < 0:
-                                error = input("Sub odds is negative. "+str(sub_odds))
+                                raise ValueError("Sub odds is negative. "+str(sub_odds))
                             elif sub_odds > 1:
-                                error = input("Sub odds is above 1. "+str(sub_odds))
+                                raise ValueError("Sub odds is above 1. "+str(sub_odds))
                         
                             return sub_odds
                         
@@ -2179,10 +2202,10 @@ while True:
         # We died, restart!
         if death_flag:
             if not too_long and debug_deaths:
-                error = input("Why did we die?")
+                raise ValueError("Why did we die?")
                 
             if predestination_mode:
-                error = input("Died in predestination mode.")
+                raise ValueError("Died in predestination mode.")
                 
             continue
         
