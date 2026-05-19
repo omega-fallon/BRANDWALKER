@@ -847,11 +847,13 @@ def hashable_brane_state(brane_state: list[int]):
         string += bin(brane_state[i])
     return string
 
-## Given a brand layout, checks to see if there's anything that can definitively prove which brand room we're in. If it can, it returns that Void Lord's name, otherwise it returns an empty string.
+## Given a brane layout, checks to see if there's anything that can definitively prove which brand room we're in. If it can, it returns that Void Lord's name, otherwise it returns an empty string.
 def prove_void_lord(brane_state: list[int]):
     # fill in
     
     return ""
+
+movement_state_dictionary = {}
 
 ## Generates a random brane state. By default, it excludes only truly impossible things like multiple players and exits, but (in the future) it can be toggled to be made more restrictive.
 def random_brane():
@@ -1240,6 +1242,20 @@ def random_brane():
 def brane_walk(brane_state: list[int], input: str, state_space = False):
     global death_flag, working_moves, steps_since_last_glass, steps_since_last_bump, steps_since_last_chain
     
+     ## Update glass & chain counter.
+    player_index = get_player_index(brane_state)
+    player_land_data = get_land_value_from_tile(brane_state[player_index])
+    
+    if (player_land_data == glass_value):
+        steps_since_last_glass = 0
+    else:
+        steps_since_last_glass += 1
+        
+    if (player_land_data == chain_inactive_value or player_land_data == chain_active_value):
+        steps_since_last_chain = 0
+    else:
+        steps_since_last_chain += 1
+    
     if input == "Z":
         full_faced_tile_data = tile_in_direction_of_player(brane_state)
         faced_land_data = get_land_value_from_tile(full_faced_tile_data)
@@ -1298,7 +1314,7 @@ def brane_walk(brane_state: list[int], input: str, state_space = False):
         if get_rock_value_from_tile(full_moving_tile_data) == hands_present_value:
             print("Error! Death by hand?? Hands?!!")
             death_flag = True
-            return
+            return "death"
         # Moving into a rock.
         elif get_rock_value_from_tile(full_moving_tile_data) == rock_present_value:
             steps_since_last_bump = 0
@@ -1318,6 +1334,8 @@ def brane_walk(brane_state: list[int], input: str, state_space = False):
             elif input == "R":
                 rock_destination_index = move_cartesian(player_index,2,0)
                 rock_destination_tile_value = tile_at_moved_cartesian(player_index,brane_state,2,0)
+            else:
+                raise ValueError("Unrecognized input: "+input)
             
             rock_destination_land_value = get_land_value_from_tile(rock_destination_tile_value)
             rock_destination_rock_value = get_rock_value_from_tile(rock_destination_tile_value)
@@ -1338,12 +1356,12 @@ def brane_walk(brane_state: list[int], input: str, state_space = False):
                 # Moved from glass
                 if moving_land_data == glass_value:
                     if moving_tile_index == -1:
-                        error = input("1moving_tile_index == -1 and was attempted to be used as an index")
+                        raise ValueError("1moving_tile_index == -1 and was attempted to be used as an index")
                     brane_state[moving_tile_index] = 0
                 # Leave identical land behind.
                 else:
                     if moving_tile_index == -1:
-                        error = input("2moving_tile_index == -1 and was attempted to be used as an index")
+                        raise ValueError("2moving_tile_index == -1 and was attempted to be used as an index")
                     brane_state[moving_tile_index] = create_tile_data(0, 0, moving_land_data)
                     
                 ## This code automatically deals with killing enemies.
@@ -1351,8 +1369,8 @@ def brane_walk(brane_state: list[int], input: str, state_space = False):
                 # Moving into a pit, do nothing.
                 if rock_destination_land_value == void_value:
                     pass
-                # Moving onto a white tile, glass, or stairs.
-                elif rock_destination_land_value == white_value or rock_destination_land_value == glass_value or rock_destination_land_value == exit_value:
+                # Moving onto a white tile, glass, stairs, or button.
+                elif rock_destination_land_value == white_value or rock_destination_land_value == glass_value or rock_destination_land_value == exit_value or rock_destination_land_value == button_value:
                     brane_state[rock_destination_index] = create_tile_data(rock_entity_type, rock_present_value, rock_destination_land_value)
                 # Moving onto an inactive chain tile.
                 elif rock_destination_land_value == chain_inactive_value:
@@ -1364,10 +1382,10 @@ def brane_walk(brane_state: list[int], input: str, state_space = False):
                     if get_player_index(brane_state, handling_absent_case=True) == -1:
                         print("Error! Death by remote chain dispersion??")
                         death_flag = True
-                        return
+                        return "death"
                 # Unhandled tile type.
                 else:
-                    error = input("Error! Cannot resolve world state!1 " + input + " " + str(rock_destination_land_value))
+                    raise ValueError("Error! Cannot resolve world state!1 " + input + " " + str(rock_destination_land_value))
                     return "???"
         else:
             # Update glass and chain counters.
@@ -1389,14 +1407,14 @@ def brane_walk(brane_state: list[int], input: str, state_space = False):
                     # If the tile we're moving into is an active chain, trigger a dispersion.
                     if moving_land_data == chain_active_value:
                         if moving_tile_index == -1:
-                            error = input("3moving_tile_index == -1 and was attempted to be used as an index")
+                            raise ValueError("3moving_tile_index == -1 and was attempted to be used as an index")
                         trigger_chain_disperse(brane_state, moving_tile_index)
                     
                     # Final check to see if the brand is carved by this final action.
                     if not is_brand_carved(brane_state, brand_dicts[chosen_brand]):
                         print("Error! Death by pit??")
                         death_flag = True
-                        return
+                        return "death"
                 # nah bro we good I got wings and I'm not floating either
                 else:
                     # Remove player from source tile
@@ -1408,15 +1426,15 @@ def brane_walk(brane_state: list[int], input: str, state_space = False):
                     # Disperse chains
                     if moving_land_data == chain_active_value:
                         if moving_tile_index == -1:
-                            error = input("4moving_tile_index == -1 and was attempted to be used as an index")
+                            raise ValueError("4moving_tile_index == -1 and was attempted to be used as an index")
                         trigger_chain_disperse(brane_state, moving_tile_index)
                     
                     # Add player to destination tile
                     if moving_tile_index == -1:
-                        error = input("5moving_tile_index == -1 and was attempted to be used as an index")
+                        raise ValueError("5moving_tile_index == -1 and was attempted to be used as an index")
                     brane_state[moving_tile_index] = create_tile_data(1, direction_letter_to_number(input), 0)
-            # Tile is a solid tile, glass, chain, or walkable stairs.
-            elif moving_land_data == white_value or moving_land_data == glass_value or moving_land_data == chain_inactive_value or (moving_land_data == exit_value and not stairs_exitable_question(brane_state)):
+            # Tile is a solid tile, glass, chain, button, or walkable stairs.
+            elif moving_land_data == white_value or moving_land_data == glass_value or moving_land_data == chain_inactive_value or moving_land_data == button_value or (moving_land_data == exit_value and not stairs_exitable_question(brane_state)):
                 steps_since_last_bump += 1
                 
                 # Remove player from source tile
@@ -1428,11 +1446,11 @@ def brane_walk(brane_state: list[int], input: str, state_space = False):
                 # Add player to destination tile
                 if moving_land_data == chain_inactive_value:
                     if moving_tile_index == -1:
-                        error = input("6moving_tile_index == -1 and was attempted to be used as an index")
+                        raise ValueError("6moving_tile_index == -1 and was attempted to be used as an index")
                     brane_state[moving_tile_index] = create_tile_data(1, direction_letter_to_number(input), chain_active_value)
                 else:
                     if moving_tile_index == -1:
-                        error = input("7moving_tile_index == -1 and was attempted to be used as an index")
+                        raise ValueError("7moving_tile_index == -1 and was attempted to be used as an index")
                     brane_state[moving_tile_index] = create_tile_data(1, direction_letter_to_number(input), moving_land_data)
             # Tile we're moving into is active stairs.
             elif moving_land_data == exit_value and stairs_exitable_question(brane_state):
@@ -1446,15 +1464,17 @@ def brane_walk(brane_state: list[int], input: str, state_space = False):
                 if floating(brane_state):
                     print("Error! Death by wing pushing??")
                     death_flag = True
-                return "death"
+                    return "death"
                 
                 brane_state[player_index] = create_tile_data(1, direction_letter_to_number(input), player_land_data)
             else:
-                error = input("Error! Cannot resolve world state!2 " + input)
-        return "???"
+                raise ValueError("Error! Cannot resolve world state!2 " + input + " " + str(moving_land_data))
+                return "???"
     else:
-        error = input("Error! Cannot resolve world state!3 " + input)
+        raise ValueError("Error! Cannot resolve world state!3 " + input)
         return "???"
+        
+    return brane_state
 
 ## The dictionaries! ##
 player_down_solid = create_tile_data(1, 1, white_value)
@@ -1697,6 +1717,7 @@ steps_since_last_bump = 0
 steps_since_last_chain = 0
 trimmings = []
 working_moves = ""
+state_space_walker = True
 
 while True:
     print("\n")
@@ -1724,14 +1745,8 @@ while True:
         predestination_mode = not predestination_mode
         continue
     if chosen_brane == "brane":
-        import time
-        stopwatch = time.time()
-        x = 0
-        while x < 100:
-            print(display_brane(random_brane()))
-            x += 1
-        print(str(time.time() - stopwatch))
-        notice = input("Made a bunch for ya, boss.")
+        state_space_walker = True
+        continue
         
     chosen_brand = input("...And the brand?\n")
     chosen_brand = chosen_brand.lower()
@@ -1774,6 +1789,42 @@ while True:
     bad_solutions.clear()
     bad_solutions_distance.clear()
     weirdo_flag = False
+    
+    if state_space_walker:
+        import time
+        stopwatch = time.time()
+        
+        try:
+            if wings:
+                movement_state_dictionary = pickle.load(open('movement_winged.pkl', 'rb'))
+            else:
+                movement_state_dictionary = pickle.load(open('movement_wingless.pkl', 'rb'))
+        except:
+            pass
+        
+        x = 0
+        while x < 100:
+            b = random_brane()
+            print(display_brane(b))
+            
+            movement_state_dictionary[hashable_brane_state(b)] = [
+                brane_walk(list(b), "D", True),
+                brane_walk(list(b), "L", True),
+                brane_walk(list(b), "U", True),
+                brane_walk(list(b), "R", True)
+            ]
+            
+            x += 1
+            
+        import pickle
+        
+        if wings:
+            pickle.dump(movement_state_dictionary, open('movement_winged.pkl', 'wb'))
+        else:
+            pickle.dump(movement_state_dictionary, open('movement_wingless.pkl', 'wb'))
+            
+        print(str(time.time() - stopwatch))
+        notice = input("Made a bunch for ya, boss.")
     
     cache_location = "bad_solutions/"+combo_name_full()+".txt"
     # Attempt to read the cache.
@@ -2030,20 +2081,6 @@ while True:
                     print("Current state: ",current_solids + held_valids())
                     print(display_brane(current_brane_layout))
                     error = input("")
-
-            ## Update glass & chain counter.
-            player_index = get_player_index(current_brane_layout)
-            player_land_data = get_land_value_from_tile(current_brane_layout[player_index])
-            
-            if (player_land_data == glass_value):
-                steps_since_last_glass = 0
-            else:
-                steps_since_last_glass += 1
-                
-            if (player_land_data == chain_inactive_value or player_land_data == chain_active_value):
-                steps_since_last_chain = 0
-            else:
-                steps_since_last_chain += 1
 
             ## Check for safe choices.
             #print("penis cock balls penis!!")
