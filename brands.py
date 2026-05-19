@@ -2,6 +2,12 @@
 
 ## TODO and SUGGESTIONS
 ## - "i would recommend setting bits and then bit masking for tile properties instead of polynomial coding, cause checking divisibility might be slower "
+## B107 watcher statues
+## mimic movement
+## sword killing
+## beaver movement
+## statues disappear in tan's room
+## code it so statues pushed into a corner ACTUALLY turn into walls, except in tan's room
 
 ## DONE
 ## ADD A CACHE FOR FOUND BAD SOLUTIONS
@@ -85,22 +91,22 @@ base_value_3 = base_value*base_value*base_value
 
 bits_per_variable = 3
 
-player_entity_type = 1
-beaver_entity_type = 2
-mimic_entity_type = 3
-rock_entity_type = 4
+player_entity_type = 0b001
+beaver_entity_type = 0b010
+mimic_entity_type = 0b011
+rock_entity_type = 0b100
 
-rock_present_value = 1
-hands_present_value = 2
+rock_present_value = 0b001
+hands_present_value = 0b010
 
-pit_value = 0
-white_value = 1
-glass_value = 2
-chain_inactive_value = 3
-chain_active_value = 4
-button_value = 5
-exit_value = 6
-wall_value = 7
+pit_value = 0b000
+white_value = 0b001
+glass_value = 0b010
+chain_inactive_value = 0b011
+chain_active_value = 0b100
+button_value = 0b101
+exit_value = 0b110
+wall_value = 0b111
 
 def create_tile_data(entity_type: int, entity_value: int, land: int):
     if entity_type > base_value-1 or entity_value > base_value-1 or land > base_value-1 or entity_type < 0 or entity_value < 0 or land < 0:
@@ -144,7 +150,7 @@ def get_player_value_from_tile(x: int):
     if get_entity_type_from_tile(x) != 1:
         return 0
         
-    x -= base_value_2*1
+    x -= base_value_2#*1
     return x >> bits_per_variable
     
 ## Given a tile value, extracts the land value.
@@ -176,7 +182,7 @@ def is_brand_carved(brane_state: list[int], brand: list[int]):
 
     return True
     
-## Given a brane state and a brand, returns true if the brand is currently successfully carved, ignoring stairs.
+## Given a brane state and a brand, returns true if the brand is currently successfully carved, treating stairs as void.
 def is_brand_carved_minus_stairs(brane_state: list[int], brand: list[int]):
     ## First, validate the inputs to avoid any dumb mistakes.
     for i in range(36):
@@ -189,11 +195,9 @@ def is_brand_carved_minus_stairs(brane_state: list[int], brand: list[int]):
     ## Now, check in earnest.
     for i in range(36):
         i_brane_state_land = get_land_value_from_tile(brane_state[i])
-        if i_brane_state_land == pit_value and brand[i] == 0:
+        if (i_brane_state_land == pit_value or i_brane_state_land == exit_value) and brand[i] == 0:
             continue
-        elif i_brane_state_land == exit_value and brand[i] == 0:
-            continue
-        elif i_brane_state_land != pit_value and brand[i] == 1:
+        elif i_brane_state_land != pit_value and i_brane_state_land != exit_value and brand[i] == 1:
             continue
         return False
 
@@ -212,11 +216,11 @@ def is_brand_carved_minus_stood_glass(brane_state: list[int], brand: list[int]):
     ## Now, check in earnest.
     for i in range(36):
         i_brane_state_land = get_land_value_from_tile(brane_state[i])
-        if i_brane_state_land == pit_value and brand[i] == 0:
+        if brand[i] == 0 and i_brane_state_land == pit_value:
             continue
-        elif i_brane_state_land != pit_value and i_brane_state_land != exit_value and brand[i] == 1:
+        elif brand[i] == 1 and i_brane_state_land != pit_value and i_brane_state_land != exit_value:
             continue
-        elif i_brane_state_land == glass_value and get_entity_type_from_tile(brane_state[i]) == player_entity_type and brand[i] == 0:
+        elif brand[i] == 0 and i_brane_state_land == glass_value and get_entity_type_from_tile(brane_state[i]) == player_entity_type:
             continue
         return False
 
@@ -403,6 +407,11 @@ def stairs_exitable_question(brane_state: list[int]):
     if len(brane_state) != 36:
         error = input("Error! Brane with invalid length: " + str(len(brane_state)))
 
+    # Check the rod first.
+    if exit_value in held_tiles:
+        return False
+
+    # Check the brane.
     for i in range(36):
         if get_land_value_from_tile(brane_state[i]) == button_value:
             # Button doesn't have a rock on it but does have a non-player entity on it.
@@ -831,7 +840,241 @@ def safe_choice_list(brane_state: list[int], stupid_flaggot: bool = False):
     
     return stupid_horse
 
+## Given a brane state, converts to a hashable (dictionary key–valid) form
+def hashable_brane_state(brane_state: list[int]):
+    string = ""
+    for i in range(36):
+        string += bin(brane_state[i])
+    return string
+
+## Generates a random brane state. By default, it excludes only truly impossible things like multiple players and exits, but (in the future) it can be toggled to be made more restrictive.
+def random_brane(wings: bool = False, sword: bool = False):
+    # Choices to choose from
+    valid_lands = {pit_value, white_value, glass_value, chain_inactive_value, chain_active_value, button_value, exit_value}#, wall_value}
+    valid_entities = {0,player_entity_type, beaver_entity_type, mimic_entity_type, rock_entity_type}
+        
+    # These will help eliminate configurations irrelevant to our purpose.
+    add_whites = 18
+    eus_whites = 3
+    bee_whites = 18
+    mon_whites = 18
+    tan_whites = 22
+    gor_whites = 11
+    lev_whites = 14
+    cif_whites = 11
+    
+    add_glass = 0
+    eus_glass = 30
+    bee_glass = 0
+    mon_glass = 14
+    tan_glass = 0
+    gor_glass = 23
+    lev_glass = 0
+    cif_glass = 0
+    
+    max_whites = max(add_whites,eus_whites,bee_whites,mon_whites,tan_whites,gor_whites,lev_whites,cif_whites)
+    placed_whites = 0
+    
+    max_glass = 30
+    placed_glass = 0
+    
+    max_chains = 19
+    placed_chains = 0
+    
+    max_rocks = 7
+    placed_rocks = 0
+    
+    max_hands_hands = 13
+    placed_hands_hands = 0
+    
+    placed_buttons = 0
+    
+    room_monster = "" # Beavers, mimics, and hands are mutually exclusive.
+    
+    array = []
+    
+    for i in range(36):
+        # Land
+        if i == 0 or i == 5 or i == 30 or i == 35:
+            land = random.choice(valid_lands + {wall_value})
+        else:
+            land = random.choice(valid_lands)
+        
+        if land == white_value:
+            # Maximum on whites
+            placed_whites += 1
+            if placed_white == max_whites:
+                valid_lands.remove(white_value)
+            elif placed_white > max_whites:
+                error = input("Random brane: max whites exceeded.")
+                valid_lands.remove(white_value)
+                
+            # The maximum of all brand rooms with glass
+            if placed_white >= 18:
+                if placed_glass > 0:
+                    valid_lands.remove(white_value)
+                else:
+                    valid_lands.remove(glass_value)
+            # >14 glass means we can't be in B089
+            if placed_white > mon_whites:
+                valid_lands.remove(button_value)
+            # As above, with chains.
+            if placed_white > lev_whites:
+                if placed_chains > 0:
+                    valid_lands.remove(white_value)
+                else:
+                    valid_lands.remove(chain_inactive_value)
+                    valid_lands.remove(chain_active_value)
+        elif land == glass_value:
+            # Maximum on glass
+            placed_glass += 1
+            if placed_glass == max_glass:
+                valid_lands.remove(glass_value)
+            elif placed_glass > max_glass:
+                error = input("Random brane: max whites exceeded.")
+                valid_lands.remove(glass_value)
+            
+            # Glass is incompatible with these.
+            valid_lands.remove(chain_inactive_value)
+            valid_lands.remove(chain_active_value)
+            
+            valid_entities.remove(beaver_entity_type)
+            
+            # >14 glass means we can't be in B089
+            if placed_glass > 14:
+                valid_lands.remove(button_value)
+        elif land == chain_inactive_value or land == chain_active_value:
+            # Maximum on chains
+            placed_chains += 1
+            if placed_chains == max_chains:
+                valid_lands.remove(chain_inactive_value)
+                valid_lands.remove(chain_active_value)
+            elif placed_chains > max_chains:
+                error = input("Random brane: max chains exceeded.")
+                valid_lands.remove(chain_inactive_value)
+                valid_lands.remove(chain_active_value)
+                
+            # Chains are incompatible with these.
+            valid_lands.remove(glass_value)
+            
+            valid_entities.remove(beaver_entity_type)
+            valid_entities.remove(mimic_entity_type)
+            
+            # Presence of chains means no monsters
+            room_monster = "peaceful"
+        elif land == button_value:
+            # Only one button is allowed, and it's incompatible with these.
+            placed_buttons += 1
+            valid_lands.remove(button_value)
+            valid_lands.remove(chain_inactive_value)
+            valid_lands.remove(chain_active_value)
+            
+            valid_entities.remove(beaver_entity_type)
+            valid_entities.remove(mimic_entity_type)
+            
+            # Presence of button means no monsters
+            room_monster = "peaceful"
+            
+            # Presence of button sets maximums on whites and glasses
+            if max_whites > mon_whites:
+                max_whites = mon_whites
+            if max_glass > mon_glass:
+                max_glass = mon_glass
+        elif land == exit_value:
+            valid_lands.remove(exit_value)
+        
+        # Entity type
+        entity_type = 0
+        if land != void_value and land != wall_value and land != chain_inactive_value: # Not a typo: an entity being on an inactive tile is impossible.
+            entity_type = random.choice(valid_entities)
+            
+            # Rock can't go here!
+            while room_monster != "hands!" and (i == 0 or i == 5 or i == 30 or i == 35) and entity_type == rock_entity_type:
+                entity_type = random.choice(valid_entities)
+            
+            # Only one player allowed.
+            if entity_type == player_entity_type:
+                valid_entities.remove(player_entity_type)
+            # Only one beaver allowed.
+            elif entity_type == beaver_entity_type:
+                if room_monster != "":
+                    error = input("Random brane error: attempted to place mimic on brane with the following room_monster: "+room_monster)
+                    
+                room_monster = "beaver"
+                valid_entities.remove(beaver_entity_type)
+                
+                if placed_glass > 0:
+                    error = input("Random brane error: attempted to place beaver on brane with glass.")
+                else:
+                    valid_lands.remove(glass_value)
+                    
+                if placed_chains > 0:
+                    error = input("Random brane error: attempted to place beaver on brane with chains.")
+                else:
+                    valid_lands.remove(chain_inactive_value)
+                    valid_lands.remove(chain_active_value)
+            # Only one mimic allowed.
+            elif entity_type == mimic_entity_type:
+                if room_monster != "":
+                    error = input("Random brane error: attempted to place mimic on brane with the following room_monster: "+room_monster)
+                
+                room_monster = "mimic"
+                valid_entities.remove(mimic_entity_type)
+                
+                if placed_chains > 0:
+                    error = input("Random brane error: attempted to place beaver on brane with chains.")
+                else:
+                    valid_lands.remove(chain_inactive_value)
+                    valid_lands.remove(chain_active_value)
+            elif entity_type == rock_entity_type:
+                placed_rocks += 1
+                
+                # Maximum on rocks.
+                if placed_rocks - placed_hands_hands == max_rocks:
+                    valid_entities.remove(rock_entity_type)
+                elif placed_rocks - placed_hands_hands > max_rocks:
+                    error = input("Random brane: max rocks exceeded.")
+                    valid_entities.remove(rock_entity_type)
+                
+                # B179 has only one rock.
+                if placed_chains > 0:
+                    valid_entities.remove(rock_entity_type)
+                
+        # Include chance for floating player.
+        elif land == void_value and wings and player_entity_type in valid_entities:
+            entity_type = random.choice({0,player_entity_type})
+            if entity_type == player_entity_type:
+                valid_entities.remove(player_entity_type)
+        
+        # Then entity value
+        entity_value = 0
+        if entity_type == 0:
+            pass
+        elif entity_type == rock_entity_type:
+            if (room_monster == "" or room_monster == "hands!") and not placed_hands_hands >= max_hands_hands:
+                entity_value = random.choice({rock_present_value, hands_present_value})
+                room_monster = "hands!"
+                
+                # Add hands (hands!)
+                placed_hands_hands += 1
+                
+                # Hands (hands!) are incompatible with these.
+                valid_lands.remove(button_value)
+                
+                valid_entities.remove(beaver_entity_type)
+                valid_entities.remove(mimic_entity_type)
+            else:
+                entity_value = rock_present_value
+        else:
+            entity_value = random.choice({1,2,3,4})
+        
+        # Finally push
+        array.append(create_tile_data(entity_type,entity_value,land))
+
+    return array
+
 #### State traversal function has a special spot right here. ####
+## Returns nothing, directly modifying the input array. Account for this!!
 def brane_walk(brane_state: list[int], input: str):
     global death_flag, working_moves, steps_since_last_glass, steps_since_last_bump, steps_since_last_chain
     
@@ -1309,6 +1552,12 @@ while True:
     if chosen_brane == "pred" or chosen_brane == "predestination":
         predestination_mode = not predestination_mode
         continue
+    if chosen_brane == "brane":
+        x = 100
+        while x < 100:
+            print(display_brane(random_brane()))
+            x += 1
+        notice = input("Made a bunch for ya, boss.")
         
     chosen_brand = input("...And the brand?\n")
     chosen_brand = chosen_brand.lower()
