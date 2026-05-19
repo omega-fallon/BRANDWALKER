@@ -915,8 +915,14 @@ def random_brane():
     
     for i in range(36):
         # Land
+        # Ensure a player gets placed.
+        if i == 35 and player_entity_type in valid_entities:
+            if not wings and void_value in valid_lands:
+                valid_lands.remove(void_value)
+            if chain_inactive_value in valid_lands:
+                valid_lands.remove(chain_inactive_value)
         # Attempt to place a wall
-        if i == 0 or i == 5 or i == 30 or i == 35:
+        elif i == 0 or i == 5 or i == 30 or i == 35:
             # Is a wall valid here? See if we can definitively determine what room we're in and check that way.
             
             # Eus
@@ -942,12 +948,11 @@ def random_brane():
             else:
                 land = random.choice(valid_lands + [wall_value])
                 
-                # Eliminations
+                # Eliminations based on wall placement.
                 if land == wall_value:
                     # Bee
                     if beaver_entity_type in valid_entities and (i == 0 or i == 5 or i == 35):
                         valid_entities.remove(beaver_entity_type)
-                        
         else:
             land = random.choice(valid_lands)
             
@@ -960,16 +965,8 @@ def random_brane():
                 raise ValueError("Random brane: max whites exceeded: "+str(placed_whites)+"/"+str(max_whites))
                 valid_lands.remove(white_value)
                 
-            # The maximum of all brand rooms with glass
-            if placed_glass > 0 and placed_whites >= max_whites_in_glass:
-                # We're exactly at the limit.
-                if placed_whites == max_whites_in_glass and white_value in valid_lands:
-                    valid_lands.remove(white_value)
-                # Above the limit.
-                else:
-                    raise ValueError("Random brane: brane has glass, but more white tiles placed than is valid for branes with glass.")
             # No glass has been placed, and placing any would result in an invalid state.
-            elif placed_glass == 0 and placed_whites > max_whites_in_glass and glass_value in valid_lands:
+            if placed_glass == 0 and placed_whites > max_whites_in_glass and glass_value in valid_lands:
                 valid_lands.remove(glass_value)
                 
             # Excess whites means we can't be in Bee's room
@@ -995,7 +992,8 @@ def random_brane():
                 if placed_chains > 0:
                     if placed_whites > lev_whites:
                         raise ValueError("Error, chains are placed but there are more white tiles than Lev's room.")
-                    valid_lands.remove(white_value)
+                    if white_value in valid_lands:
+                        valid_lands.remove(white_value)
                 else:
                     if (chain_inactive_value in valid_lands)^(chain_active_value in valid_lands):
                         raise ValueError("Random brane: chain lands aren't both eliminated or both present")
@@ -1012,10 +1010,10 @@ def random_brane():
                 valid_lands.remove(glass_value)
                 
             # The maximum of all brand rooms with glass
-            if placed_whites == max_whites_in_glass:
-                valid_lands.remove(placed_whites)
-            elif placed_whites >= max_whites_in_glass:
-                raise ValueError("Random brane: brane has glass, but more white tiles placed than is valid for branes with glass.")
+            if max_whites > max_whites_in_glass:
+                max_whites = max_whites_in_glass
+            if placed_whites > max_whites_in_glass:
+                raise ValueError("Random brane: brane has glass, but more white tiles placed than is valid for branes with glass.\n"+display_brane(array))
             
             # Glass is incompatible with chains.
             if (chain_inactive_value in valid_lands)^(chain_active_value in valid_lands):
@@ -1118,7 +1116,11 @@ def random_brane():
         
         # Entity type
         entity_type = 0
-        if land != void_value and land != wall_value and land != chain_inactive_value: # Not a typo: an entity being on an inactive tile is impossible.
+        
+        # Ensure a player gets placed.
+        if i == 35 and player_entity_type in valid_entities:
+            entity_type = player_entity_type
+        elif land != void_value and land != wall_value and land != chain_inactive_value: # Not a typo: an entity being on an inactive tile is impossible.
             entity_type = random.choice(valid_entities)
             
             # Rock can't go here!
@@ -1817,14 +1819,12 @@ while True:
         import time
         stopwatch = time.time()
         
-        try:
-            if wings:
-                movement_state_dictionary = pickle.load(open('movement_winged.pkl', 'rb'))
-            else:
-                movement_state_dictionary = pickle.load(open('movement_wingless.pkl', 'rb'))
-        except:
-            pass
-        
+        import pickle
+        if wings:
+            movement_state_dictionary = pickle.load(open('movement_winged.pkl', 'rb'))
+        else:
+            movement_state_dictionary = pickle.load(open('movement_wingless.pkl', 'rb'))
+            
         x = 0
         while x < 10000:
             b = random_brane()
@@ -1837,9 +1837,13 @@ while True:
                 brane_walk(list(b), "R", True)
             ]
             
-            x += 1
+            if i % 100 == 0:
+                if wings:
+                    pickle.dump(movement_state_dictionary, open('movement_winged.pkl', 'wb'))
+                else:
+                    pickle.dump(movement_state_dictionary, open('movement_wingless.pkl', 'wb'))
             
-        import pickle
+            x += 1
         
         if wings:
             pickle.dump(movement_state_dictionary, open('movement_winged.pkl', 'wb'))
