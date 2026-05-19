@@ -959,18 +959,17 @@ def random_brane():
                 valid_lands.remove(white_value)
                 
             # The maximum of all brand rooms with glass
-            if placed_whites >= max(eus_whites,mon_whites,gor_whites):
-                # We've already placed glass.
-                if placed_glass > 0:
-                    # We're exactly at the limit.
-                    if placed_whites == max(eus_whites,mon_whites,gor_whites) and white_value in valid_lands:
-                        valid_lands.remove(white_value)
-                    # Above the limit.
-                    else:
-                        error = input("Random brane: brane has glass, but more white tiles placed than is valid for branes with glass.")
-                # No glass has been placed.
-                elif glass_value in valid_lands:
-                    valid_lands.remove(glass_value)
+            if placed_whites >= max(eus_whites,mon_whites,gor_whites) and placed_glass > 0:
+                # We're exactly at the limit.
+                if placed_whites == max(eus_whites,mon_whites,gor_whites) and white_value in valid_lands:
+                    valid_lands.remove(white_value)
+                # Above the limit.
+                else:
+                    error = input("Random brane: brane has glass, but more white tiles placed than is valid for branes with glass.")
+            # No glass has been placed, and placing any would result in an invalid state.
+            elif placed_glass == 0 and placed_whites > max(eus_whites,mon_whites,gor_whites) and glass_value in valid_lands:
+                valid_lands.remove(glass_value)
+                
             # Excess whites means we can't be in Bee's room
             if placed_whites > bee_whites:
                 if room_monster == "beaver":
@@ -1010,9 +1009,9 @@ def random_brane():
                 error = input("Random brane: max glass exceeded: "+str(placed_glass)+"/"+str(max_glass))
                 valid_lands.remove(glass_value)
                 
-            # Stupid shit.
+            # The maximum of all brand rooms with glass
             if placed_whites == max(eus_whites,mon_whites,gor_whites):
-                valid_lands.remove(glass_value)
+                valid_lands.remove(placed_whites)
             elif placed_whites >= max(eus_whites,mon_whites,gor_whites):
                 error = input("Random brane: brane has glass, but more white tiles placed than is valid for branes with glass.")
             
@@ -1733,6 +1732,7 @@ while True:
     chosen_brane = chosen_brane.lower()
     
     if chosen_brane == "wings":
+        movement_state_dictionary.clear()
         wings = not wings
         continue
     if chosen_brane == "sword":
@@ -1803,7 +1803,7 @@ while True:
             pass
         
         x = 0
-        while x < 100:
+        while x < 10000:
             b = random_brane()
             print(display_brane(b))
             
