@@ -333,8 +333,8 @@ def get_right_tile_land_value(brane_state: list[int]):
     return get_land_value_from_tile(tile_in_direction_of_player(brane_state,"R"))
 
 ## Returns true if the void rod can take a file.
-def void_rod_can_take():
-    return len(held_tiles) == 0 or endless
+def void_rod_can_take(passed_tiles = held_tiles):
+    return len(passed_tiles) == 0 or endless
 
 ## Returns the opposite direction of the input. Returns a letter if inputted a letter and a number if inputted a number.
 def opposite_direction(x):
@@ -841,11 +841,18 @@ def safe_choice_list(brane_state: list[int], stupid_flaggot: bool = False):
     return stupid_horse
 
 ## Given a brane state, converts to a hashable (dictionary key–valid) form
-def hashable_brane_state(brane_state: list[int]):
+def hashable_brane_state(game_state: list[list]):
+    # New rules!
+    if len(game_state) != 2 or type(game_state[0]) is not list or type(game_state[1]) is not list:
+        raise ValueError("hashable_brane_state passed a brane state and not a game state.")
+    
+    if len(game_state[0]) != 36:
+        raise ValueError("hashable_brane_state passed an invalid-length tile state.")
+    
     string = ""
     for i in range(36):
-        string += bin(brane_state[i])
-    return string
+        string += bin(game_state[0][i])
+    return int(string,2)
 
 ## Given a brane layout, checks to see if there's anything that can definitively prove which brand room we're in. If it can, it returns that Void Lord's name, otherwise it returns an empty string.
 def prove_void_lord(brane_state: list[int]):
@@ -1263,12 +1270,12 @@ def random_brane():
 
 #### State traversal function has a special spot right here. ####
 ## Returns nothing, directly modifying the input array. Account for this!!
-def brane_walk(brane_state: list[int], input: str, state_space = False):
+def brane_walk(brane_state: list[list], input: str, state_space = False):
     global death_flag, working_moves, steps_since_last_glass, steps_since_last_bump, steps_since_last_chain
     
      ## Update glass & chain counter.
-    player_index = get_player_index(brane_state)
-    player_land_data = get_land_value_from_tile(brane_state[player_index])
+    player_index = get_player_index(brane_state[0])
+    player_land_data = get_land_value_from_tile(brane_state[0][player_index])
     
     if (player_land_data == glass_value):
         steps_since_last_glass = 0
@@ -1278,60 +1285,59 @@ def brane_walk(brane_state: list[int], input: str, state_space = False):
     if (player_land_data == chain_inactive_value or player_land_data == chain_active_value):
         steps_since_last_chain = 0
     else:
-        steps_since_last_chain += 1
+        steps_since_lastf_chain += 1
     
     if input == "Z":
-        full_faced_tile_data = tile_in_direction_of_player(brane_state)
+        full_faced_tile_data = tile_in_direction_of_player(brane_state[0])
         faced_land_data = get_land_value_from_tile(full_faced_tile_data)
         
         # Slaaaaaayy the beaaast!!!
         if sword and ((get_entity_type_from_tile(full_faced_tile_data) in [beaver_entity_type, mimic_entity_type]) or get_rock_value_from_tile(full_faced_tile_data) == hands_present_value):
-            brane_state[index_tile_in_direction_of_player(brane_state)] = create_tile_data(0,0,faced_land_data)
+            brane_state[0][index_tile_in_direction_of_player(brane_state[0])] = create_tile_data(0,0,faced_land_data)
         # Is tile invalid for both pickup and placedown?
         elif full_faced_tile_data != faced_land_data or faced_land_data == wall_value: # (Explanation: this inequality means there is an entity on the tile, meaning an enemy or a rock. The second one is just checking if the tile is a wall, which is self-explanatory.) 
             if safe_choices == ["Z"]:
                 print("Only valid move is Z but Z does nothing. Resetting...")
                 death_flag = True
-                return "death"
             
             if state_space:
-                pass
+                return "self"
             else:
                 working_moves = working_moves[:-1]
         # Tile is valid for pickup.
-        elif faced_land_data != void_value and faced_land_data != wall_value and void_rod_can_take():
+        elif faced_land_data != void_value and faced_land_data != wall_value and void_rod_can_take(brane_state[1]):
             steps_since_last_bump += 1
             
             # Put tile on void rod.
-            held_tiles.append(faced_land_data)
+            brane_state[1].append(faced_land_data)
 
             # Remove the tile from the world.
-            brane_state[index_tile_in_direction_of_player(brane_state)] = 0
+            brane_state[0][index_tile_in_direction_of_player(brane_state[0])] = 0
         # Placing tile.
-        elif full_faced_tile_data == void_value and len(held_tiles) > 0:
+        elif full_faced_tile_data == void_value and len(brane_state[1]) > 0:
             steps_since_last_bump += 1
             
             # Place the tile into the world.
-            brane_state[index_tile_in_direction_of_player(brane_state)] = held_tiles[-1]
+            brane_state[0][index_tile_in_direction_of_player(brane_state[0])] = brane_state[1][-1]
 
             # Remove the tile from the void rod.
-            held_tiles.pop()
+            brane_state[1].pop()
         # Cannot do anything.
         else:
             if safe_choices == ["Z"]:
                 print("Only valid move is Z but Z does nothing. Resetting...")
                 death_flag = True
-                return "death"
+            return "self"
             
             working_moves = working_moves[:-1]
     elif (input == "D" or input == "L" or input == "U" or input == "R"):
-        moving_tile_index = index_tile_in_direction_of_player(brane_state, direction_letter_to_number(input))
+        moving_tile_index = index_tile_in_direction_of_player(brane_state[0], direction_letter_to_number(input))
 
         if moving_tile_index == -1:
             full_moving_tile_data = wall_value
             moving_land_data = wall_value
         else:
-            full_moving_tile_data = tile_in_direction_of_player(brane_state, direction_letter_to_number(input))
+            full_moving_tile_data = tile_in_direction_of_player(brane_state[0], direction_letter_to_number(input))
             moving_land_data = get_land_value_from_tile(full_moving_tile_data)
 
         # Moving into a hand (hands!)
@@ -1348,16 +1354,16 @@ def brane_walk(brane_state: list[int], input: str, state_space = False):
             rock_destination_tile_value = 0
             if input == "D":
                 rock_destination_index = move_cartesian(player_index,0,2)
-                rock_destination_tile_value = tile_at_moved_cartesian(player_index,brane_state,0,2)
+                rock_destination_tile_value = tile_at_moved_cartesian(player_index,brane_state[0],0,2)
             elif input == "L":
                 rock_destination_index = move_cartesian(player_index,-2,0)
-                rock_destination_tile_value = tile_at_moved_cartesian(player_index,brane_state,-2,0)
+                rock_destination_tile_value = tile_at_moved_cartesian(player_index,brane_state[0],-2,0)
             elif input == "U":
                 rock_destination_index = move_cartesian(player_index,0,-2)
-                rock_destination_tile_value = tile_at_moved_cartesian(player_index,brane_state,0,-2)
+                rock_destination_tile_value = tile_at_moved_cartesian(player_index,brane_state[0],0,-2)
             elif input == "R":
                 rock_destination_index = move_cartesian(player_index,2,0)
-                rock_destination_tile_value = tile_at_moved_cartesian(player_index,brane_state,2,0)
+                rock_destination_tile_value = tile_at_moved_cartesian(player_index,brane_state[0],2,0)
             else:
                 raise ValueError("Unrecognized input: "+input)
             
@@ -1365,12 +1371,20 @@ def brane_walk(brane_state: list[int], input: str, state_space = False):
             rock_destination_rock_value = get_rock_value_from_tile(rock_destination_tile_value)
             
             # Player does a push.
-            if floating(brane_state):
+            if floating(brane_state[0]):
                 print("Error! Death by wing pushing??")
                 death_flag = True
-                return "death"
+                
+                brane_state[0][player_index] = void_value
+                
+                if not state_space:
+                    if not is_brand_carved(brane_state[0], brand_dicts[chosen_brand]):
+                        print("Error! Death by remote chain dispersion??")
+                        death_flag = True
+                    
+                return brane_state
             else:
-                brane_state[player_index] = create_tile_data(1, direction_letter_to_number(input), player_land_data)
+                brane_state[0][player_index] = create_tile_data(1, direction_letter_to_number(input), player_land_data)
             
             # If this is a wall or another rock, it can't move.
             if rock_destination_land_value == wall_value or rock_destination_rock_value == rock_present_value:
@@ -1381,12 +1395,12 @@ def brane_walk(brane_state: list[int], input: str, state_space = False):
                 if moving_land_data == glass_value:
                     if moving_tile_index == -1:
                         raise ValueError("1moving_tile_index == -1 and was attempted to be used as an index")
-                    brane_state[moving_tile_index] = 0
+                    brane_state[0][moving_tile_index] = 0
                 # Leave identical land behind.
                 else:
                     if moving_tile_index == -1:
                         raise ValueError("2moving_tile_index == -1 and was attempted to be used as an index")
-                    brane_state[moving_tile_index] = create_tile_data(0, 0, moving_land_data)
+                    brane_state[0][moving_tile_index] = create_tile_data(0, 0, moving_land_data)
                     
                 ## This code automatically deals with killing enemies.
                 
@@ -1395,18 +1409,20 @@ def brane_walk(brane_state: list[int], input: str, state_space = False):
                     pass
                 # Moving onto a white tile, glass, stairs, or button.
                 elif rock_destination_land_value == white_value or rock_destination_land_value == glass_value or rock_destination_land_value == exit_value or rock_destination_land_value == button_value:
-                    brane_state[rock_destination_index] = create_tile_data(rock_entity_type, rock_present_value, rock_destination_land_value)
+                    brane_state[0][rock_destination_index] = create_tile_data(rock_entity_type, rock_present_value, rock_destination_land_value)
                 # Moving onto an inactive chain tile.
                 elif rock_destination_land_value == chain_inactive_value:
-                    brane_state[rock_destination_index] = create_tile_data(rock_entity_type, rock_present_value, chain_active_value)
+                    brane_state[0][rock_destination_index] = create_tile_data(rock_entity_type, rock_present_value, chain_active_value)
                 # Moving onto an ACTIVE chain tile.
                 elif rock_destination_land_value == chain_active_value:
-                    trigger_chain_disperse(brane_state, rock_destination_index)
+                    trigger_chain_disperse(brane_state[0], rock_destination_index)
                     
-                    if get_player_index(brane_state, handling_absent_case=True) == -1:
-                        print("Error! Death by remote chain dispersion??")
-                        death_flag = True
-                        return "death"
+                    if not state_space:
+                        if not is_brand_carved(brane_state[0], brand_dicts[chosen_brand]) and get_player_index(brane_state[0], handling_absent_case=True) == -1:
+                            print("Error! Death by remote chain dispersion??")
+                            death_flag = True
+                        
+                    return brane_state
                 # Unhandled tile type.
                 else:
                     raise ValueError("Error! Cannot resolve world state!1 " + input + " " + str(rock_destination_land_value))
@@ -1421,63 +1437,65 @@ def brane_walk(brane_state: list[int], input: str, state_space = False):
             # Tile we're moving into is a pit. (Or an active chain, which is similar.)
             if moving_land_data == void_value or moving_land_data == chain_active_value:
                 # Moving into a pit is a death sentence.
-                if not wings or (wings and floating(brane_state)):
+                if not wings or (wings and floating(brane_state[0])):
                     # Remove player from source tile
                     if player_land_data == glass_value:
-                        brane_state[player_index] = void_value
+                        brane_state[0][player_index] = void_value
                     else:
-                        brane_state[player_index] = create_tile_data(0, 0, player_land_data)
+                        brane_state[0][player_index] = create_tile_data(0, 0, player_land_data)
                     
                     # If the tile we're moving into is an active chain, trigger a dispersion.
                     if moving_land_data == chain_active_value:
                         if moving_tile_index == -1:
                             raise ValueError("3moving_tile_index == -1 and was attempted to be used as an index")
-                        trigger_chain_disperse(brane_state, moving_tile_index)
+                        trigger_chain_disperse(brane_state[0], moving_tile_index)
                     
-                    # Final check to see if the brand is carved by this final action.
-                    if not is_brand_carved(brane_state, brand_dicts[chosen_brand]):
-                        print("Error! Death by pit??")
-                        death_flag = True
-                        return "death"
+                    if state_space:
+                        return brane_state
+                    else:
+                        # Final check to see if the brand is carved by this final action.
+                        if not is_brand_carved(brane_state[0], brand_dicts[chosen_brand]):
+                            print("Error! Death by pit??")
+                            death_flag = True
                 # nah bro we good I got wings and I'm not floating either
                 else:
                     # Remove player from source tile
                     if player_land_data == glass_value:
-                        brane_state[player_index] = void_value
+                        brane_state[0][player_index] = void_value
                     else:
-                        brane_state[player_index] = create_tile_data(0, 0, player_land_data)
+                        brane_state[0][player_index] = create_tile_data(0, 0, player_land_data)
                     
                     # Disperse chains
                     if moving_land_data == chain_active_value:
                         if moving_tile_index == -1:
                             raise ValueError("4moving_tile_index == -1 and was attempted to be used as an index")
-                        trigger_chain_disperse(brane_state, moving_tile_index)
+                        trigger_chain_disperse(brane_state[0], moving_tile_index)
                     
                     # Add player to destination tile
                     if moving_tile_index == -1:
                         raise ValueError("5moving_tile_index == -1 and was attempted to be used as an index")
-                    brane_state[moving_tile_index] = create_tile_data(1, direction_letter_to_number(input), 0)
+                    brane_state[0][moving_tile_index] = create_tile_data(1, direction_letter_to_number(input), 0)
             # Tile is a solid tile, glass, chain, button, or walkable stairs.
-            elif moving_land_data == white_value or moving_land_data == glass_value or moving_land_data == chain_inactive_value or moving_land_data == button_value or (moving_land_data == exit_value and not stairs_exitable_question(brane_state)):
+            elif moving_land_data == white_value or moving_land_data == glass_value or moving_land_data == chain_inactive_value or moving_land_data == button_value or (moving_land_data == exit_value and not stairs_exitable_question(brane_state[0])):
                 steps_since_last_bump += 1
                 
                 # Remove player from source tile
                 if player_land_data == glass_value:
-                    brane_state[player_index] = void_value
+                    brane_state[0][player_index] = void_value
                 else:
-                    brane_state[player_index] = create_tile_data(0, 0, player_land_data)
+                    brane_state[0][player_index] = create_tile_data(0, 0, player_land_data)
                     
                 # Add player to destination tile
                 if moving_land_data == chain_inactive_value:
                     if moving_tile_index == -1:
                         raise ValueError("6moving_tile_index == -1 and was attempted to be used as an index")
-                    brane_state[moving_tile_index] = create_tile_data(1, direction_letter_to_number(input), chain_active_value)
+                    brane_state[0][moving_tile_index] = create_tile_data(1, direction_letter_to_number(input), chain_active_value)
                 else:
                     if moving_tile_index == -1:
                         raise ValueError("7moving_tile_index == -1 and was attempted to be used as an index")
-                    brane_state[moving_tile_index] = create_tile_data(1, direction_letter_to_number(input), moving_land_data)
+                    brane_state[0][moving_tile_index] = create_tile_data(1, direction_letter_to_number(input), moving_land_data)
             # Tile we're moving into is active stairs.
-            elif moving_land_data == exit_value and stairs_exitable_question(brane_state):
+            elif moving_land_data == exit_value and stairs_exitable_question(brane_state[0]):
                 print("Error! Death by stairs??")
                 death_flag = True
                 return "death"
@@ -1485,12 +1503,14 @@ def brane_walk(brane_state: list[int], input: str, state_space = False):
             elif moving_land_data == wall_value:
                 steps_since_last_bump = 0
                 
-                if floating(brane_state):
+                if floating(brane_state[0]):
                     print("Error! Death by wing pushing??")
                     death_flag = True
-                    return "death"
-                
-                brane_state[player_index] = create_tile_data(1, direction_letter_to_number(input), player_land_data)
+                    
+                    brane_state[player_index] = void_value
+                    return brane_state
+                else:
+                    brane_state[player_index] = create_tile_data(1, direction_letter_to_number(input), player_land_data)
             else:
                 raise ValueError("Error! Cannot resolve world state!2 " + input + " " + str(moving_land_data))
                 return "???"
@@ -1741,7 +1761,9 @@ steps_since_last_bump = 0
 steps_since_last_chain = 0
 trimmings = []
 working_moves = ""
-state_space_walker = True
+random_brane_generation = False
+
+breadth_first_state_space_search = True
 
 while True:
     print("\n")
@@ -1770,7 +1792,7 @@ while True:
         predestination_mode = not predestination_mode
         continue
     if chosen_brane == "brane":
-        state_space_walker = True
+        random_brane_generation = True
         continue
         
     chosen_brand = input("...And the brand?\n")
@@ -1815,43 +1837,50 @@ while True:
     bad_solutions_distance.clear()
     weirdo_flag = False
     
-    if state_space_walker:
-        import time
-        stopwatch = time.time()
-        
-        import pickle
-        if wings:
-            movement_state_dictionary = pickle.load(open('movement_winged.pkl', 'rb'))
-        else:
-            movement_state_dictionary = pickle.load(open('movement_wingless.pkl', 'rb'))
+    # For testing/bulking up the cache.
+    if random_brane_generation:
+        while True:
+            import time
+            stopwatch = time.time()
             
-        x = 0
-        while x < 10000:
-            b = random_brane()
-            print(display_brane(b))
-            
-            movement_state_dictionary[hashable_brane_state(b)] = [
-                brane_walk(list(b), "D", True),
-                brane_walk(list(b), "L", True),
-                brane_walk(list(b), "U", True),
-                brane_walk(list(b), "R", True)
-            ]
-            
-            if i % 100 == 0:
+            import pickle
+            try:
                 if wings:
-                    pickle.dump(movement_state_dictionary, open('movement_winged.pkl', 'wb'))
+                    movement_state_dictionary = pickle.load(open('movement_winged.pkl', 'rb'))
                 else:
-                    pickle.dump(movement_state_dictionary, open('movement_wingless.pkl', 'wb'))
+                    movement_state_dictionary = pickle.load(open('movement_wingless.pkl', 'rb'))
+            except FileNotFoundError:
+                pass
+            except (e):
+                raise e
+                
+            x = 0
+            while x < 100000000:
+                b = random_brane()
+                print(display_brane(b))
+                
+                movement_state_dictionary[hashable_brane_state(b)] = [
+                    brane_walk(list(b), "D", True),
+                    brane_walk(list(b), "L", True),
+                    brane_walk(list(b), "U", True),
+                    brane_walk(list(b), "R", True)
+                ]
+                
+                if x % 100 == 0:
+                    if wings:
+                        pickle.dump(movement_state_dictionary, open('movement_winged.pkl', 'wb'))
+                    else:
+                        pickle.dump(movement_state_dictionary, open('movement_wingless.pkl', 'wb'))
+                
+                x += 1
             
-            x += 1
-        
-        if wings:
-            pickle.dump(movement_state_dictionary, open('movement_winged.pkl', 'wb'))
-        else:
-            pickle.dump(movement_state_dictionary, open('movement_wingless.pkl', 'wb'))
-            
-        print(str(time.time() - stopwatch))
-        notice = input("Made a bunch for ya, boss.")
+            if wings:
+                pickle.dump(movement_state_dictionary, open('movement_winged.pkl', 'wb'))
+            else:
+                pickle.dump(movement_state_dictionary, open('movement_wingless.pkl', 'wb'))
+                
+            print(str(time.time() - stopwatch))
+            notice = input("Made a bunch for ya, boss.")
     
     cache_location = "bad_solutions/"+combo_name_full()+".txt"
     # Attempt to read the cache.
@@ -1877,7 +1906,7 @@ while True:
                         else:
                             bad_solutions_distance.append(int(lines[i].strip()))
     except FileNotFoundError:
-        print("No cache found.")
+        print("No bad_solutions cache found.")
     
     while True:
         # Iteration
@@ -1896,322 +1925,389 @@ while True:
         steps_since_last_chain = 0
         trimmings.clear()
         
-        if working_moves != "":
-            #if len(bad_solutions) > 0 and working_moves == bad_solutions[-1]:
-            #    print("Solution finder has generated the exact same (wrong) sequence of inputs twice in a row. This nearly-certainly implies a bug.")
-            
-            # Check for duplicates.
-            if working_moves not in bad_solutions:
-                bad_solutions.append(working_moves)
-                print("Calculating distance from Heaven...")
-                bad_solutions_distance.append(distance_from_heaven(current_brane_layout,brand_dicts[chosen_brand]))
-                print("Calculated distance from Heaven.")
-            
-            # Writing to cache.
-            with open(cache_location, "w", encoding="utf-8") as f:
-                if len(bad_solutions) != len(bad_solutions_distance):
-                    raise ValueError("Bad solutions arrays not same length fuck it all burn it down")
+        # This changes the way the entire program works.
+        if breadth_first_state_space_search:
+            # Attempt to load our pickled dictionary.
+            import pickle
+            try:
+                if wings:
+                    movement_state_dictionary = pickle.load(open('movement_winged.pkl', 'rb'))
+                else:
+                    movement_state_dictionary = pickle.load(open('movement_wingless.pkl', 'rb'))
+            except FileNotFoundError:
+                pass
+            except (e):
+                raise e
                 
-                for i in range(len(bad_solutions) + len(bad_solutions_distance)):
-                    if i % 2 == 0:
-                        f.write(bad_solutions[int(i/2)]+"\n")
-                    else:
-                        f.write(str(bad_solutions_distance[int(i/2)])+"\n")
-                    
-            # I SPENT 1 AND A HALF HOURS TRYING TO FIGURE OUT WHY ASSIGNMENTS WEREN'T WORKING BECAUSE APPARENTLY WHEN YOU ASSIGN THE VARIABLE AS THE KEY, CHANGING THE VARIABLE CHANGES THE KEY AND ASSIGNING AGAIN JUST OVERRIDES WHAT WAS THERE INSTEAD OF JUST LOGGING IT AS THE NEW VALUE. I HATE DATA DICTIONARIES IN PYTHON. HATE. HATE. HATE. LET ME TE
-            #failed_loops_distance[bad_solutions[-1]] = distance_from_heaven(current_brane_layout,brand_dicts[chosen_brand])
+            # Keep a set of all visited nodes. If we ever re-visit them, we ignore it.
+            visited_nodes = set()
             
-        working_moves = ""
-        current_brane_layout.clear()
-        current_brane_layout = list(brane_dicts[chosen_brane])
-        
-        # Soft predestination mode only kicks in after X iterations, to give better odds-reporting.
-        if soft_predestination:
-            predestination_mode = solution_loop_counter >= 20
-
-        ## Try random moves until we get there!
-        death_flag = False
-        while True:
-            moving_loops += 1
-            
-            if not endless and len(held_tiles) > 1:
-                raise ValueError("Endless Void Rod is not enabled but length of held_tiles array is > 1.")
-            
-            ## Did we do it?
-            if is_brand_carved(current_brane_layout, brand_dicts[chosen_brand]):
-                break
-            
-            print("Current moves: " + str(working_moves) + " while holding " + str(held_tiles))
-            print(display_brane(current_brane_layout))
-            print(count_valids(current_brane_layout))
-            
-            ## Special failure states
-            def special_failure_states(brane_state):
-                print("Checking special failures.")
-                # Breakables can't be broken...
-                if count_valids(brane_state)+held_valids() == count_valids(brand_dicts[chosen_brand]):
-                    # No chain tiles.
-                    flag = False
-                    for i in range(36):
-                        if get_land_value_from_tile(brane_state[i]) == chain_inactive_value:
-                            flag = True
-                            break
-                    
-                    if not flag:
-                        # The brand isn't carved...
-                        if not is_brand_carved(brane_state,brand_dicts[chosen_brane]):
-                            # No wings...
-                            if not wings:
-                                # Not holding a solid tile...
-                                if not (white_value in held_tiles) and not (not stairs_exitable_question(brane_state) and (exit_value in held_tiles)):
-                                    # There exists no 3-line for the player to traverse with.
-                                    if not three_line_present_strict(brane_state):
-                                        print("Unrecoverable situation: no 3 line and glass can't be broken.")
-                                        return True
+            # Keep this path always updated.
+            path_from_beginning_to_current_node = []
                 
-                # Cornered.
-                if not wings or floating(brane_state):
-                    # Surrounded, surrounded, surrounded, surrounded.
-                    if get_down_tile_land_value(brane_state) == void_value or get_down_tile_land_value(brane_state) == wall_value:
-                        if get_left_tile_land_value(brane_state) == void_value or get_left_tile_land_value(brane_state) == wall_value:
-                            if get_up_tile_land_value(brane_state) == void_value or get_up_tile_land_value(brane_state) == wall_value:
-                                if get_right_tile_land_value(brane_state) == void_value or get_right_tile_land_value(brane_state) == wall_value:
-                                    # Facing the corner or facing a pit without anything to place.
-                                    faced_tile_land_value = get_land_value_from_tile(tile_in_direction_of_player(brane_state))
-                                    if faced_tile_land_value == wall_value or (faced_tile_land_value == void_value and len(held_tiles) == 0):
-                                        return True
-
+            # Begin our search at the very beginning, holding nothing.
+            nodes_to_check = {"start": { [brane_dicts[chosen_brane],[]] } }
             
-            if special_failure_states(current_brane_layout):
-                death_flag = True
-                break
-            
-            ## YOUR TAKING TOO LONG
-            if not here_be_monsters_question(brane_dicts[chosen_brane]):
-                print("Trimming down repetitive movements...")
+            # The nodes to check on the NEXT iteration of the big loop.
+            branches_to_check_next = dict()
                 
-                # High-level theft of a Nintendo console.
-                # ...It's just shorthand for some counters.
-                def gbc_gt(x):
-                    return steps_since_last_glass > x and steps_since_last_bump > x and steps_since_last_chain > x
+            # Iterate
+            while True:
+                path_root_this_iteration = []
                 
-                # Pickup, turn 180 degrees, and place right where it was before.
-                if len(working_moves) >= 5 and gbc_gt(5) and working_moves[-5] == working_moves[-2] and working_moves[-4] == "Z" and working_moves[-3] == opposite_direction(working_moves[-2]) and working_moves[-1] == "Z":
-                    if len(trimmings) > 2 and trimmings[-1] == trimmings[-2] and trimmings[-1] == [working_moves[-4],working_moves[-3],working_moves[-2],working_moves[-1]]:
-                        print("Error! Trimming same sequence thrice in a row, likely infinite loop!")
-                        death_flag = True
-                        break
-                    if predestination_mode:
-                        raise ValueError("Trimming occurred in predestined choices.")
+                # Iterate through each branch.
+                for branch in nodes_to_check:
+                    # The path needed to go from the beginning to this branch's root node.
+                    branch_path = path_root_this_iteration+branch
                     
-                    last_trimmed = moving_loops
-                    trimmings.append([working_moves[-4],working_moves[-3],working_moves[-2],working_moves[-1]])
-                    
-                    working_moves = working_moves[:-4]
-                # Start facing a direction, go opposite, then go right back to facing the same way.
-                if len(working_moves) >= 3 and gbc_gt(3) and working_moves[-1] == working_moves[-3] and working_moves[-2] == opposite_direction(working_moves[-1]):
-                    if len(trimmings) > 2 and trimmings[-1] == trimmings[-2] and trimmings[-1] == [working_moves[-2],working_moves[-1]]:
-                        print("Error! Trimming same sequence thrice in a row, likely infinite loop!")
-                        death_flag = True
-                        break
-                    if predestination_mode:
-                        raise ValueError("Trimming occurred in predestined choices.")
-                    
-                    last_trimmed = moving_loops
-                    trimmings.append([working_moves[-2],working_moves[-1]])
-                    
-                    working_moves = working_moves[:-2]     
-                # spin in a dizziful bliss
-                if len(working_moves) >= 5 and gbc_gt(5):
-                    store = [working_moves[-5],working_moves[-4],working_moves[-3],working_moves[-2],working_moves[-1]]
-                    loops = [
-                        # guys stop spinning clockwise
-                        ["R","D","L","U","R"],
-                        ["D","L","U","R","D"],
-                        ["L","U","R","D","L"],
-                        ["U","R","D","L","U"],
+                    # Iterate through each leaf.
+                    for node in nodes_to_check[branch]: 
+                        # Check if we've been here before. If so, no need to recalculate.
+                        if node in visited_nodes:
+                            continue
                         
-                        # COUNTERCLOCKWISE!!!
-                        ["R","U","L","D","R"],
-                        ["U","L","D","R","U"],
-                        ["L","D","R","U","L"],
-                        ["D","R","U","L","D"],
-                    ]
+                        # Establish having been here.
+                        visited_nodes.add(node)
+                        
+                        # Keep path updated.
+                        path_from_beginning_to_current_node = path_root_this_iteration+[node]
+                        
+                        # Check to see if this node is solved.
+                        if is_brand_carved(node, brand_dicts[chosen_brand]):
+                            # Do something
+                        
+                        # The cache dictionary needs a hashable form of the brane state.
+                        hashabled_node = hashable_brane_state(node)
+                        
+                        # Establish cache value if needed.
+                        if hashabled_node not in movement_state_dictionary:
+                            movement_state_dictionary[hashabled_node] =  = [
+                                brane_walk(list(node), "D", True),
+                                brane_walk(list(node), "L", True),
+                                brane_walk(list(node), "U", True),
+                                brane_walk(list(node), "R", True),
+                                brane_walk(list(node), "Z", True),
+                            ]
+                        
+                        # Search this node's neighbors.
+                        branches_to_check_next[node] = {movement_state_dictionary[hashabled_node][0],movement_state_dictionary[hashabled_node][1],movement_state_dictionary[hashabled_node][2],movement_state_dictionary[hashabled_node][3],movement_state_dictionary[hashabled_node][4]}
+        else:
+            if working_moves != "":
+                #if len(bad_solutions) > 0 and working_moves == bad_solutions[-1]:
+                #    print("Solution finder has generated the exact same (wrong) sequence of inputs twice in a row. This nearly-certainly implies a bug.")
+                
+                # Check for duplicates.
+                if working_moves not in bad_solutions:
+                    bad_solutions.append(working_moves)
+                    print("Calculating distance from Heaven...")
+                    bad_solutions_distance.append(distance_from_heaven(current_brane_layout,brand_dicts[chosen_brand]))
+                    print("Calculated distance from Heaven.")
+                
+                # Writing to cache.
+                with open(cache_location, "w", encoding="utf-8") as f:
+                    if len(bad_solutions) != len(bad_solutions_distance):
+                        raise ValueError("Bad solutions arrays not same length fuck it all burn it down")
                     
-                    if store in loops:
+                    for i in range(len(bad_solutions) + len(bad_solutions_distance)):
+                        if i % 2 == 0:
+                            f.write(bad_solutions[int(i/2)]+"\n")
+                        else:
+                            f.write(str(bad_solutions_distance[int(i/2)])+"\n")
+                        
+                # I SPENT 1 AND A HALF HOURS TRYING TO FIGURE OUT WHY ASSIGNMENTS WEREN'T WORKING BECAUSE APPARENTLY WHEN YOU ASSIGN THE VARIABLE AS THE KEY, CHANGING THE VARIABLE CHANGES THE KEY AND ASSIGNING AGAIN JUST OVERRIDES WHAT WAS THERE INSTEAD OF JUST LOGGING IT AS THE NEW VALUE. I HATE DATA DICTIONARIES IN PYTHON. HATE. HATE. HATE. LET ME TE
+                #failed_loops_distance[bad_solutions[-1]] = distance_from_heaven(current_brane_layout,brand_dicts[chosen_brand])
+                
+            working_moves = ""
+            current_brane_layout.clear()
+            current_brane_layout = list(brane_dicts[chosen_brane])
+            
+            # Soft predestination mode only kicks in after X iterations, to give better odds-reporting.
+            if soft_predestination:
+                predestination_mode = solution_loop_counter >= 20
+
+            ## Try random moves until we get there!
+            death_flag = False
+            while True:
+                moving_loops += 1
+                
+                if not endless and len(held_tiles) > 1:
+                    raise ValueError("Endless Void Rod is not enabled but length of held_tiles array is > 1.")
+                
+                ## Did we do it?
+                if is_brand_carved(current_brane_layout, brand_dicts[chosen_brand]):
+                    break
+                
+                print("Current moves: " + str(working_moves) + " while holding " + str(held_tiles))
+                print(display_brane(current_brane_layout))
+                print(count_valids(current_brane_layout))
+                
+                ## Special failure states
+                def special_failure_states(brane_state):
+                    print("Checking special failures.")
+                    # Breakables can't be broken...
+                    if count_valids(brane_state)+held_valids() == count_valids(brand_dicts[chosen_brand]):
+                        # No chain tiles.
+                        flag = False
+                        for i in range(36):
+                            if get_land_value_from_tile(brane_state[i]) == chain_inactive_value:
+                                flag = True
+                                break
+                        
+                        if not flag:
+                            # The brand isn't carved...
+                            if not is_brand_carved(brane_state,brand_dicts[chosen_brane]):
+                                # No wings...
+                                if not wings:
+                                    # Not holding a solid tile...
+                                    if not (white_value in held_tiles) and not (not stairs_exitable_question(brane_state) and (exit_value in held_tiles)):
+                                        # There exists no 3-line for the player to traverse with.
+                                        if not three_line_present_strict(brane_state):
+                                            print("Unrecoverable situation: no 3 line and glass can't be broken.")
+                                            return True
+                    
+                    # Cornered.
+                    if not wings or floating(brane_state):
+                        # Surrounded, surrounded, surrounded, surrounded.
+                        if get_down_tile_land_value(brane_state) == void_value or get_down_tile_land_value(brane_state) == wall_value:
+                            if get_left_tile_land_value(brane_state) == void_value or get_left_tile_land_value(brane_state) == wall_value:
+                                if get_up_tile_land_value(brane_state) == void_value or get_up_tile_land_value(brane_state) == wall_value:
+                                    if get_right_tile_land_value(brane_state) == void_value or get_right_tile_land_value(brane_state) == wall_value:
+                                        # Facing the corner or facing a pit without anything to place.
+                                        faced_tile_land_value = get_land_value_from_tile(tile_in_direction_of_player(brane_state))
+                                        if faced_tile_land_value == wall_value or (faced_tile_land_value == void_value and len(held_tiles) == 0):
+                                            return True
+
+                
+                if special_failure_states(current_brane_layout):
+                    death_flag = True
+                    break
+                
+                ## YOUR TAKING TOO LONG
+                if not here_be_monsters_question(brane_dicts[chosen_brane]):
+                    print("Trimming down repetitive movements...")
+                    
+                    # High-level theft of a Nintendo console.
+                    # ...It's just shorthand for some counters.
+                    def gbc_gt(x):
+                        return steps_since_last_glass > x and steps_since_last_bump > x and steps_since_last_chain > x
+                    
+                    # Pickup, turn 180 degrees, and place right where it was before.
+                    if len(working_moves) >= 5 and gbc_gt(5) and working_moves[-5] == working_moves[-2] and working_moves[-4] == "Z" and working_moves[-3] == opposite_direction(working_moves[-2]) and working_moves[-1] == "Z":
                         if len(trimmings) > 2 and trimmings[-1] == trimmings[-2] and trimmings[-1] == [working_moves[-4],working_moves[-3],working_moves[-2],working_moves[-1]]:
                             print("Error! Trimming same sequence thrice in a row, likely infinite loop!")
                             death_flag = True
                             break
                         if predestination_mode:
                             raise ValueError("Trimming occurred in predestined choices.")
-                            
+                        
                         last_trimmed = moving_loops
                         trimmings.append([working_moves[-4],working_moves[-3],working_moves[-2],working_moves[-1]])
                         
                         working_moves = working_moves[:-4]
-                # Short stupids
-                if len(working_moves) >= 3 and gbc_gt(3):
-                    store = [working_moves[-3],working_moves[-2],working_moves[-1]]
-                    loops = [
-                        # Some Add/Add solutions do this.
-                        ["D","U","U"],
-                        ["U","D","D"],
-                        ["L","R","R"],
-                        ["R","L","L"],
-                    ]
-                    
-                    if store in loops:
-                        if len(trimmings) > 2 and trimmings[-1] == trimmings[-2] and trimmings[-1] == store:
+                    # Start facing a direction, go opposite, then go right back to facing the same way.
+                    if len(working_moves) >= 3 and gbc_gt(3) and working_moves[-1] == working_moves[-3] and working_moves[-2] == opposite_direction(working_moves[-1]):
+                        if len(trimmings) > 2 and trimmings[-1] == trimmings[-2] and trimmings[-1] == [working_moves[-2],working_moves[-1]]:
+                            print("Error! Trimming same sequence thrice in a row, likely infinite loop!")
+                            death_flag = True
+                            break
+                        if predestination_mode:
+                            raise ValueError("Trimming occurred in predestined choices.")
+                        
+                        last_trimmed = moving_loops
+                        trimmings.append([working_moves[-2],working_moves[-1]])
+                        
+                        working_moves = working_moves[:-2]     
+                    # spin in a dizziful bliss
+                    if len(working_moves) >= 5 and gbc_gt(5):
+                        store = [working_moves[-5],working_moves[-4],working_moves[-3],working_moves[-2],working_moves[-1]]
+                        loops = [
+                            # guys stop spinning clockwise
+                            ["R","D","L","U","R"],
+                            ["D","L","U","R","D"],
+                            ["L","U","R","D","L"],
+                            ["U","R","D","L","U"],
+                            
+                            # COUNTERCLOCKWISE!!!
+                            ["R","U","L","D","R"],
+                            ["U","L","D","R","U"],
+                            ["L","D","R","U","L"],
+                            ["D","R","U","L","D"],
+                        ]
+                        
+                        if store in loops:
+                            if len(trimmings) > 2 and trimmings[-1] == trimmings[-2] and trimmings[-1] == [working_moves[-4],working_moves[-3],working_moves[-2],working_moves[-1]]:
                                 print("Error! Trimming same sequence thrice in a row, likely infinite loop!")
                                 death_flag = True
                                 break
-                        if predestination_mode:
-                            raise ValueError("Trimming occurred in predestined choices.")
+                            if predestination_mode:
+                                raise ValueError("Trimming occurred in predestined choices.")
+                                
+                            last_trimmed = moving_loops
+                            trimmings.append([working_moves[-4],working_moves[-3],working_moves[-2],working_moves[-1]])
                             
-                        last_trimmed = moving_loops
-                        trimmings.append(list(store))
+                            working_moves = working_moves[:-4]
+                    # Short stupids
+                    if len(working_moves) >= 3 and gbc_gt(3):
+                        store = [working_moves[-3],working_moves[-2],working_moves[-1]]
+                        loops = [
+                            # Some Add/Add solutions do this.
+                            ["D","U","U"],
+                            ["U","D","D"],
+                            ["L","R","R"],
+                            ["R","L","L"],
+                        ]
                         
-                        working_moves = working_moves[:-3]
-                        working_moves += (store[-1])
-            
-                if last_trimmed == moving_loops:
-                    print("Trimming complete.")
-                else:
-                    print("Trimming complete without doing anything.")
-            
-            too_long = False
-            if combo_name() in known_solutions and len(working_moves) > len(known_solutions[combo_name()]):
-                print("Working moves too long. Resetting...")
-                death_flag = True
-                too_long = True
-                break
-            elif len(working_moves) > 250:
-                print("Working moves too long. Resetting...")
-                death_flag = True
-                too_long = True
-                break
-            elif count_valids(brand_dicts[chosen_brand]) > count_valids(current_brane_layout)+held_valids():
-                print("Target brand has more tiles than the current brane state. This will never work!")
-                death_flag = True
-                break
-
-            # Every so often, perform a sanity check to make sure something hasn't gone totally wrong.
-            if (not brane_has_breakable_question(brane_dicts[chosen_brane]) and len(working_moves) % 1 == 0):
-                default_solids = count_valids(brane_dicts[chosen_brane])
-                current_solids = count_valids(current_brane_layout)
-
-                if default_solids != current_solids + held_valids():
-                    print("Sanity check fucking failed!!")
-                    print("Default brane state: ", default_solids)
-                    print(display_brane(brane_dicts[chosen_brane]))
-                    print("Current state: ",current_solids + held_valids())
-                    print(display_brane(current_brane_layout))
-                    raise ValueError("")
-
-            ## Check for safe choices.
-            #print("penis cock balls penis!!")
-            safe_choices = safe_choice_list(current_brane_layout)
-            #print("pussy vagina!!")
-
-            ## No safe choices!
-            if len(safe_choices) == 0:
-                print("No safe choices... resetting...")
-                death_flag = True
-                break
-            else:
-                print("Choices are: ",safe_choices)
-            
-            ## First we establish the cache.
-            threshold_cache = {}
-            for choice in safe_choices:
-                threshold_cache[choice] = threshold_from_choice(current_brane_layout,choice)
-            
-            ## Via weighted randomness, chose a move.
-            current_move = ""
-            while current_move == "":
-                for choice in safe_choices:
-                    threshold = threshold_cache[choice]
-                    
-                    # Special case to discourage looping
-                    #if moving_loops - last_trimmed < 5 and len(trimmings) > 0 and trimmings[-1][-1] == choice:
-                    #    threshold = 0
-                    
-                    if random.random() > threshold:
-                        # Calculate chance of this specific choice being made out of all the others.
-                        # Modified the safe_choices to use a sorted list instead of a set so we can know the order they come in, making the math more feasible to make accurate.
-                        # Add the odds of it happening first loop plus the odds of it happening second loop etc. etc. until gains are negligible.
-                        
-                        non_predestined = safe_choice_list(current_brane_layout,True)
-                        non_predestined_thresholds = []
-                        
-                        for thing in non_predestined:
-                            non_predestined_thresholds.append(threshold_from_choice(current_brane_layout,thing))
-                        
-                        iteration_of_predestination = non_predestined.index(choice)
-                        
-                        def odds_iteration_machine(iterations):
-                            sub_odds = 1
-                            
-                            for i in range(len(non_predestined)*iterations):
-                                # The exact searched. Multiply by odds of happening.
-                                if i == iteration_of_predestination + len(non_predestined)*iterations:
-                                    sub_odds *= 1-non_predestined_thresholds[i % len(non_predestined)]
+                        if store in loops:
+                            if len(trimmings) > 2 and trimmings[-1] == trimmings[-2] and trimmings[-1] == store:
+                                    print("Error! Trimming same sequence thrice in a row, likely infinite loop!")
+                                    death_flag = True
                                     break
-                                # Otherwise, multiply by odds of not happening. (Random needs to be >= threshold to return True, meaning threshold is the odds of it not happening.)
-                                else:
-                                    sub_odds *= non_predestined_thresholds[i % len(non_predestined)]
-                        
-                            if sub_odds < 0:
-                                raise ValueError("Sub odds is negative. "+str(sub_odds))
-                            elif sub_odds > 1:
-                                raise ValueError("Sub odds is above 1. "+str(sub_odds))
-                        
-                            return sub_odds
-                        
-                        # Add iterations until change is negligible.
-                        odds_iterations = 1
-                        odds = 0
-                        while True:
-                            store = odds
-                            odds += odds_iteration_machine(odds_iterations)
+                            if predestination_mode:
+                                raise ValueError("Trimming occurred in predestined choices.")
+                                
+                            last_trimmed = moving_loops
+                            trimmings.append(list(store))
                             
-                            if abs(odds - store) < 0.00000001:
-                                break
-                            
-                            odds_iterations += 1
-                        
-                        # Safety detector.
-                        if len(non_predestined) == 1:
-                            odds = 1.0
-                        
-                        move_thresholds.append(round(threshold,3))
-                        move_chances.append(round(odds,6))
-                        
-                        current_move = choice
-                        break
-            
-            ## Apply the move to the list.
-            working_moves += current_move
+                            working_moves = working_moves[:-3]
+                            working_moves += (store[-1])
+                
+                    if last_trimmed == moving_loops:
+                        print("Trimming complete.")
+                    else:
+                        print("Trimming complete without doing anything.")
+                
+                too_long = False
+                if combo_name() in known_solutions and len(working_moves) > len(known_solutions[combo_name()]):
+                    print("Working moves too long. Resetting...")
+                    death_flag = True
+                    too_long = True
+                    break
+                elif len(working_moves) > 250:
+                    print("Working moves too long. Resetting...")
+                    death_flag = True
+                    too_long = True
+                    break
+                elif count_valids(brand_dicts[chosen_brand]) > count_valids(current_brane_layout)+held_valids():
+                    print("Target brand has more tiles than the current brane state. This will never work!")
+                    death_flag = True
+                    break
 
-            ## Update the brane state.
-            brane_walk(current_brane_layout, current_move)
+                # Every so often, perform a sanity check to make sure something hasn't gone totally wrong.
+                if (not brane_has_breakable_question(brane_dicts[chosen_brane]) and len(working_moves) % 1 == 0):
+                    default_solids = count_valids(brane_dicts[chosen_brane])
+                    current_solids = count_valids(current_brane_layout)
+
+                    if default_solids != current_solids + held_valids():
+                        print("Sanity check fucking failed!!")
+                        print("Default brane state: ", default_solids)
+                        print(display_brane(brane_dicts[chosen_brane]))
+                        print("Current state: ",current_solids + held_valids())
+                        print(display_brane(current_brane_layout))
+                        raise ValueError("")
+
+                ## Check for safe choices.
+                #print("penis cock balls penis!!")
+                safe_choices = safe_choice_list(current_brane_layout)
+                #print("pussy vagina!!")
+
+                ## No safe choices!
+                if len(safe_choices) == 0:
+                    print("No safe choices... resetting...")
+                    death_flag = True
+                    break
+                else:
+                    print("Choices are: ",safe_choices)
+                
+                ## First we establish the cache.
+                threshold_cache = {}
+                for choice in safe_choices:
+                    threshold_cache[choice] = threshold_from_choice(current_brane_layout,choice)
+                
+                ## Via weighted randomness, chose a move.
+                current_move = ""
+                while current_move == "":
+                    for choice in safe_choices:
+                        threshold = threshold_cache[choice]
+                        
+                        # Special case to discourage looping
+                        #if moving_loops - last_trimmed < 5 and len(trimmings) > 0 and trimmings[-1][-1] == choice:
+                        #    threshold = 0
+                        
+                        if random.random() > threshold:
+                            # Calculate chance of this specific choice being made out of all the others.
+                            # Modified the safe_choices to use a sorted list instead of a set so we can know the order they come in, making the math more feasible to make accurate.
+                            # Add the odds of it happening first loop plus the odds of it happening second loop etc. etc. until gains are negligible.
+                            
+                            non_predestined = safe_choice_list(current_brane_layout,True)
+                            non_predestined_thresholds = []
+                            
+                            for thing in non_predestined:
+                                non_predestined_thresholds.append(threshold_from_choice(current_brane_layout,thing))
+                            
+                            iteration_of_predestination = non_predestined.index(choice)
+                            
+                            def odds_iteration_machine(iterations):
+                                sub_odds = 1
+                                
+                                for i in range(len(non_predestined)*iterations):
+                                    # The exact searched. Multiply by odds of happening.
+                                    if i == iteration_of_predestination + len(non_predestined)*iterations:
+                                        sub_odds *= 1-non_predestined_thresholds[i % len(non_predestined)]
+                                        break
+                                    # Otherwise, multiply by odds of not happening. (Random needs to be >= threshold to return True, meaning threshold is the odds of it not happening.)
+                                    else:
+                                        sub_odds *= non_predestined_thresholds[i % len(non_predestined)]
+                            
+                                if sub_odds < 0:
+                                    raise ValueError("Sub odds is negative. "+str(sub_odds))
+                                elif sub_odds > 1:
+                                    raise ValueError("Sub odds is above 1. "+str(sub_odds))
+                            
+                                return sub_odds
+                            
+                            # Add iterations until change is negligible.
+                            odds_iterations = 1
+                            odds = 0
+                            while True:
+                                store = odds
+                                odds += odds_iteration_machine(odds_iterations)
+                                
+                                if abs(odds - store) < 0.00000001:
+                                    break
+                                
+                                odds_iterations += 1
+                            
+                            # Safety detector.
+                            if len(non_predestined) == 1:
+                                odds = 1.0
+                            
+                            move_thresholds.append(round(threshold,3))
+                            move_chances.append(round(odds,6))
+                            
+                            current_move = choice
+                            break
+                
+                ## Apply the move to the list.
+                working_moves += current_move
+
+                ## Update the brane state.
+                brane_walk(current_brane_layout, current_move)
+                if death_flag:
+                    break
+
+                ## Did we do it?
+                if is_brand_carved(current_brane_layout, brand_dicts[chosen_brand]):
+                    break
+
+            # We died, restart!
             if death_flag:
-                break
-
-            ## Did we do it?
-            if is_brand_carved(current_brane_layout, brand_dicts[chosen_brand]):
-                break
-
-        # We died, restart!
-        if death_flag:
-            if not too_long and debug_deaths:
-                raise ValueError("Why did we die?")
-                
-            if predestination_mode:
-                raise ValueError("Died in predestination mode.")
-                
-            continue
+                if not too_long and debug_deaths:
+                    raise ValueError("Why did we die?")
+                    
+                if predestination_mode:
+                    raise ValueError("Died in predestination mode.")
+                    
+                continue
         
         break
 
