@@ -1,16 +1,17 @@
 ## Terrible Python code, go! ##
 
 ## TODO and SUGGESTIONS
-## - "i would recommend setting bits and then bit masking for tile properties instead of polynomial coding, cause checking divisibility might be slower "
 ## B107 watcher statues
 ## mimic movement
-## sword killing
 ## beaver movement
-## statues disappear in tan's room
-## code it so statues pushed into a corner ACTUALLY turn into walls, except in tan's room
 
 ## DONE
 ## ADD A CACHE FOR FOUND BAD SOLUTIONS
+## - "i would recommend setting bits and then bit masking for tile properties instead of polynomial coding, cause checking divisibility might be slower "
+## statues disappear in tan's room
+## sword killing
+## code it so rocks pushed into a corner ACTUALLY turn into walls, except in tan's room
+## remote dispearsion makes the player float instead of killing them if winged
 
 #### Functions ####
 
@@ -97,7 +98,9 @@ mimic_entity_type = 0b011
 rock_entity_type = 0b100
 
 rock_present_value = 0b001
-hands_present_value = 0b010
+monster_statue_value = 0b010
+watcher_statue_value = 0b011
+hands_present_value = 0b100
 
 void_value = 0b000
 white_value = 0b001
@@ -114,8 +117,8 @@ def create_tile_data(entity_type: int, entity_value: int, land: int):
 
     # New data structure:
     # 3rd slot - entity type (unspecified, player, beaver, mimic, rock/hand)
-    # 2nd slot - entity value (not there, down, left, up, right); for rock (no rock, yes rock, button, rock on button, hands (hands!))
-    # 1st slot - land tiles value (pit, solid, glass, exit, wall)
+    # 2nd slot - entity value (not there, down, left, up, right); for rock (no rock, yes rock, greed, watcher, hands (hands!))
+    # 1st slot - land tiles value (pit, solid, glass, chain inactive, chain active, button, exit, wall)
     return (entity_type << (bits_per_variable*2)) | (entity_value << bits_per_variable) | land
 
 ## Given a tile value, extracts the entity type value.
@@ -358,9 +361,17 @@ def opposite_direction(x):
         return "X"
 
 ## Returns true if there any MOVING monsters in the brane. Because this is used to determine if turn-wasting is worthwhile, hands (hands!) are not counted.
-def here_be_monsters_question(brane_state: list[int]):
+def here_be_moving_monsters_question(brane_state: list[int]):
     for i in range(36):
         if get_entity_type_from_tile(brane_state[i]) == beaver_entity_type or get_entity_type_from_tile(brane_state[i]) == mimic_entity_type:
+            return True
+
+    return False
+    
+## Returns true if there any monsters in the brane, INCLUDING hands, hands!
+def here_be_monsters_questionbrane_state: list[int]):
+    for i in range(36):
+        if get_entity_type_from_tile(brane_state[i]) == beaver_entity_type or get_entity_type_from_tile(brane_state[i]) == mimic_entity_type or get_rock_value_from_tile(brane_state[i]) == hands_present_value:
             return True
 
     return False
@@ -668,7 +679,10 @@ def trigger_chain_disperse(brane_state: list[int], i: int):
                 
     # Remove the tiles.
     for triggered_i in triggered_tiles:
-        brane_state[triggered_i] = 0
+        if wings and get_entity_type_from_tile(brane_state[triggered_i]) == player_entity_type:
+            brane_state[triggered_i] = create_tile_data(player_entity_type,get_player_value_from_tile(brane_state[triggered_i]),0)
+        else:
+            brane_state[triggered_i] = 0
         
     return brane_state
     
@@ -722,11 +736,11 @@ def safe_choice_list(brane_state: list[int], stupid_flaggot: bool = False):
 
     ## The tile in front is a wall, and there are no monsters to make wasting a turn meaningful.
     ## Hitting a wall to your side CAN be useful to reposition, so we will not discount it!
-    if faced_tile_land_value == wall_value and not here_be_monsters_question(brane_state) and player_faced_direction_letter(brane_state) in choices:
+    if faced_tile_land_value == wall_value and not here_be_moving_monsters_question(brane_state) and player_faced_direction_letter(brane_state) in choices:
         choices.remove(player_faced_direction_letter(brane_state))
 
     ## Pointless movements (repetitive ones are trimmed afterward, not outright removed) ##
-    if not here_be_monsters_question(brane_state):
+    if not here_be_moving_monsters_question(brane_state):
         # Entering a dead end. (Dumb bun.)
         if get_player_land_value(brane_state) not in breakables:
             player_index = get_player_index(brane_state)
@@ -736,7 +750,6 @@ def safe_choice_list(brane_state: list[int], stupid_flaggot: bool = False):
                 if x not in choices:
                     continue
                 
-                #print("wonderwall\n"+display_brane(brane_state))
                 # Confirm potential movement tile attributes and make pawn tile variables.
                 if x == "D" and down_tile_land_value not in breakables and not land_undesirable(down_tile_land_value,brane_state):
                     pawn_land_value_attack_1 = land_at_moved_cartesian(player_index,brane_state,1,1)
@@ -775,8 +788,7 @@ def safe_choice_list(brane_state: list[int], stupid_flaggot: bool = False):
                     #print("Pawn values found not to be dead end:",pawn_land_value_attack_1,pawn_land_value_attack_2,pawn_land_value_first_turn)
                     #print("Direction:",x)
     
-    #print("because you're so smooth")
-    if not here_be_monsters_question(brane_state) and "Z" in choices:
+    if not here_be_moving_monsters_question(brane_state) and "Z" in choices:
         # Double z's are never useful without monsters
         if len(working_moves) > 0 and working_moves[-1] == "Z":
             choices.remove("Z")
@@ -784,14 +796,12 @@ def safe_choice_list(brane_state: list[int], stupid_flaggot: bool = False):
         elif not wings and void_rod_can_take() and faced_tile_land_value != 0 and brane_has_stairs_question(brane_state) and int(land_undesirable(down_tile_land_value,brane_state))+int(land_undesirable(down_tile_land_value,brane_state))+int(land_undesirable(down_tile_land_value,brane_state))+int(land_undesirable(down_tile_land_value,brane_state)) == 3:
             choices.remove("Z")
     
-    #print("one week")
     ## Historically bad choices ##
     for choice in {"D","L","U","R","Z"}:
         if (working_moves + choice) in bad_solutions and choice in choices:
             choices.remove(choice)
             #notice = input("We learned a lesson!! "+str(working_moves + choice)+" against "+str(choice))
             
-    #print("somebody once told me")
     ## Obviously correct choices ##
     if not is_brand_carved(brane_state, brand_dicts[chosen_brand]):
         # If removing the stairs is the last step and we're already facing them, always do that.
@@ -841,17 +851,20 @@ def safe_choice_list(brane_state: list[int], stupid_flaggot: bool = False):
     return stupid_horse
 
 ## Given a brane state, converts to a hashable (dictionary key–valid) form
-def hashable_brane_state(game_state: list[list]):
+def hashable_game_state(game_state: list[list]):
     # New rules!
     if len(game_state) != 2 or type(game_state[0]) is not list or type(game_state[1]) is not list:
-        raise ValueError("hashable_brane_state passed a brane state and not a game state.")
+        raise ValueError("hashable_game_state passed a brane state and not a game state.")
     
     if len(game_state[0]) != 36:
-        raise ValueError("hashable_brane_state passed an invalid-length tile state.")
+        raise ValueError("hashable_game_state passed an invalid-length tile state.")
     
     string = ""
     for i in range(36):
         string += bin(game_state[0][i])
+    for i in range(len(game_state[1])):
+        string += bin(game_state[1][i])
+        
     return int(string,2)
 
 ## Given a brane layout, checks to see if there's anything that can definitively prove which brand room we're in. If it can, it returns that Void Lord's name, otherwise it returns an empty string.
@@ -859,6 +872,15 @@ def prove_void_lord(brane_state: list[int]):
     # fill in
     
     return ""
+
+## Given a brane state_ removes any monster statues if there are no monsters present.
+def eliminate_monster_statues(brane_state: list[int]):
+    if here_be_monsters_questionbrane_state):
+        for i in range(36):
+            if get_rock_value_from_tile(brane_state[i]) == monster_statue_value:
+                brane_state[i] = create_tile_data(0, 0, get_land_value_from_tile(brane_state[i]))
+    
+    return brane_state
 
 movement_state_dictionary = {}
 
@@ -1269,13 +1291,20 @@ def random_brane():
     return array
 
 #### State traversal function has a special spot right here. ####
-## Returns nothing, directly modifying the input array. Account for this!!
-def brane_walk(brane_state: list[list], input: str, state_space = False):
+## Directly modifies the input array. Account for this!!
+def brane_walk(game_state: list[list], input: str, state_space = False):
     global death_flag, working_moves, steps_since_last_glass, steps_since_last_bump, steps_since_last_chain
     
-     ## Update glass & chain counter.
-    player_index = get_player_index(brane_state[0])
-    player_land_data = get_land_value_from_tile(brane_state[0][player_index])
+    ## Validation.
+    if len(game_state) != 2 or type(game_state[0]) is not list or type(game_state[1]) is not list:
+        raise ValueError("brane_walk passed a brane state and not a game state.")
+    
+    if len(game_state[0]) != 36:
+        raise ValueError("brane_walk passed an invalid-length tile state.")
+    
+    ## Update glass & chain counter.
+    player_index = get_player_index(game_state[0])
+    player_land_data = get_land_value_from_tile(game_state[0][player_index])
     
     if (player_land_data == glass_value):
         steps_since_last_glass = 0
@@ -1285,15 +1314,17 @@ def brane_walk(brane_state: list[list], input: str, state_space = False):
     if (player_land_data == chain_inactive_value or player_land_data == chain_active_value):
         steps_since_last_chain = 0
     else:
-        steps_since_lastf_chain += 1
+        steps_since_last_chain += 1
     
     if input == "Z":
-        full_faced_tile_data = tile_in_direction_of_player(brane_state[0])
+        full_faced_tile_data = tile_in_direction_of_player(game_state[0])
         faced_land_data = get_land_value_from_tile(full_faced_tile_data)
         
         # Slaaaaaayy the beaaast!!!
         if sword and ((get_entity_type_from_tile(full_faced_tile_data) in [beaver_entity_type, mimic_entity_type]) or get_rock_value_from_tile(full_faced_tile_data) == hands_present_value):
-            brane_state[0][index_tile_in_direction_of_player(brane_state[0])] = create_tile_data(0,0,faced_land_data)
+            game_state[0][index_tile_in_direction_of_player(game_state[0])] = create_tile_data(0,0,faced_land_data)
+            game_state[0] = eliminate_monster_statues(game_state[0])
+                
         # Is tile invalid for both pickup and placedown?
         elif full_faced_tile_data != faced_land_data or faced_land_data == wall_value: # (Explanation: this inequality means there is an entity on the tile, meaning an enemy or a rock. The second one is just checking if the tile is a wall, which is self-explanatory.) 
             if safe_choices == ["Z"]:
@@ -1301,27 +1332,27 @@ def brane_walk(brane_state: list[list], input: str, state_space = False):
                 death_flag = True
             
             if state_space:
-                return "self"
+                 "self"
             else:
                 working_moves = working_moves[:-1]
         # Tile is valid for pickup.
-        elif faced_land_data != void_value and faced_land_data != wall_value and void_rod_can_take(brane_state[1]):
+        elif faced_land_data != void_value and faced_land_data != wall_value and void_rod_can_take(game_state[1]):
             steps_since_last_bump += 1
             
             # Put tile on void rod.
-            brane_state[1].append(faced_land_data)
+            game_state[1].append(faced_land_data)
 
             # Remove the tile from the world.
-            brane_state[0][index_tile_in_direction_of_player(brane_state[0])] = 0
+            game_state[0][index_tile_in_direction_of_player(game_state[0])] = 0
         # Placing tile.
-        elif full_faced_tile_data == void_value and len(brane_state[1]) > 0:
+        elif full_faced_tile_data == void_value and len(game_state[1]) > 0:
             steps_since_last_bump += 1
             
             # Place the tile into the world.
-            brane_state[0][index_tile_in_direction_of_player(brane_state[0])] = brane_state[1][-1]
+            game_state[0][index_tile_in_direction_of_player(game_state[0])] = game_state[1][-1]
 
             # Remove the tile from the void rod.
-            brane_state[1].pop()
+            game_state[1].pop()
         # Cannot do anything.
         else:
             if safe_choices == ["Z"]:
@@ -1331,13 +1362,13 @@ def brane_walk(brane_state: list[list], input: str, state_space = False):
             
             working_moves = working_moves[:-1]
     elif (input == "D" or input == "L" or input == "U" or input == "R"):
-        moving_tile_index = index_tile_in_direction_of_player(brane_state[0], direction_letter_to_number(input))
+        moving_tile_index = index_tile_in_direction_of_player(game_state[0], direction_letter_to_number(input))
 
         if moving_tile_index == -1:
             full_moving_tile_data = wall_value
             moving_land_data = wall_value
         else:
-            full_moving_tile_data = tile_in_direction_of_player(brane_state[0], direction_letter_to_number(input))
+            full_moving_tile_data = tile_in_direction_of_player(game_state[0], direction_letter_to_number(input))
             moving_land_data = get_land_value_from_tile(full_moving_tile_data)
 
         # Moving into a hand (hands!)
@@ -1345,8 +1376,8 @@ def brane_walk(brane_state: list[list], input: str, state_space = False):
             print("Error! Death by hand?? Hands?!!")
             death_flag = True
             return "death"
-        # Moving into a rock.
-        elif get_rock_value_from_tile(full_moving_tile_data) == rock_present_value:
+        # Moving into a rock or statue.
+        elif get_rock_value_from_tile(full_moving_tile_data) != 0:
             steps_since_last_bump = 0
             
             # Determine tile the rock is moving into.
@@ -1354,16 +1385,16 @@ def brane_walk(brane_state: list[list], input: str, state_space = False):
             rock_destination_tile_value = 0
             if input == "D":
                 rock_destination_index = move_cartesian(player_index,0,2)
-                rock_destination_tile_value = tile_at_moved_cartesian(player_index,brane_state[0],0,2)
+                rock_destination_tile_value = tile_at_moved_cartesian(player_index,game_state[0],0,2)
             elif input == "L":
                 rock_destination_index = move_cartesian(player_index,-2,0)
-                rock_destination_tile_value = tile_at_moved_cartesian(player_index,brane_state[0],-2,0)
+                rock_destination_tile_value = tile_at_moved_cartesian(player_index,game_state[0],-2,0)
             elif input == "U":
                 rock_destination_index = move_cartesian(player_index,0,-2)
-                rock_destination_tile_value = tile_at_moved_cartesian(player_index,brane_state[0],0,-2)
+                rock_destination_tile_value = tile_at_moved_cartesian(player_index,game_state[0],0,-2)
             elif input == "R":
                 rock_destination_index = move_cartesian(player_index,2,0)
-                rock_destination_tile_value = tile_at_moved_cartesian(player_index,brane_state[0],2,0)
+                rock_destination_tile_value = tile_at_moved_cartesian(player_index,game_state[0],2,0)
             else:
                 raise ValueError("Unrecognized input: "+input)
             
@@ -1371,23 +1402,17 @@ def brane_walk(brane_state: list[list], input: str, state_space = False):
             rock_destination_rock_value = get_rock_value_from_tile(rock_destination_tile_value)
             
             # Player does a push.
-            if floating(brane_state[0]):
-                print("Error! Death by wing pushing??")
+            if floating(game_state[0]):
+                if not state_space:
+                    print("Error! Death by wing pushing??")
                 death_flag = True
                 
-                brane_state[0][player_index] = void_value
-                
-                if not state_space:
-                    if not is_brand_carved(brane_state[0], brand_dicts[chosen_brand]):
-                        print("Error! Death by remote chain dispersion??")
-                        death_flag = True
-                    
-                return brane_state
+                game_state[0][player_index] = void_value
             else:
-                brane_state[0][player_index] = create_tile_data(1, direction_letter_to_number(input), player_land_data)
+                game_state[0][player_index] = create_tile_data(1, direction_letter_to_number(input), player_land_data)
             
             # If this is a wall or another rock, it can't move.
-            if rock_destination_land_value == wall_value or rock_destination_rock_value == rock_present_value:
+            if rock_destination_land_value == wall_value or (rock_destination_rock_value != 0 and rock_destination_rock_value != hands_present_value):
                 pass
             # Otherwise, the rock can move.
             else:
@@ -1395,38 +1420,47 @@ def brane_walk(brane_state: list[list], input: str, state_space = False):
                 if moving_land_data == glass_value:
                     if moving_tile_index == -1:
                         raise ValueError("1moving_tile_index == -1 and was attempted to be used as an index")
-                    brane_state[0][moving_tile_index] = 0
+                    game_state[0][moving_tile_index] = 0
                 # Leave identical land behind.
                 else:
                     if moving_tile_index == -1:
                         raise ValueError("2moving_tile_index == -1 and was attempted to be used as an index")
-                    brane_state[0][moving_tile_index] = create_tile_data(0, 0, moving_land_data)
+                    game_state[0][moving_tile_index] = create_tile_data(0, 0, moving_land_data)
                     
                 ## This code automatically deals with killing enemies.
                 
-                # Moving into a pit, do nothing.
+                # Moving into a pit, do nothing since the rock has already been removed from its previous tile in the last step.
                 if rock_destination_land_value == void_value:
                     pass
                 # Moving onto a white tile, glass, stairs, or button.
                 elif rock_destination_land_value == white_value or rock_destination_land_value == glass_value or rock_destination_land_value == exit_value or rock_destination_land_value == button_value:
-                    brane_state[0][rock_destination_index] = create_tile_data(rock_entity_type, rock_present_value, rock_destination_land_value)
+                    game_state[0][rock_destination_index] = create_tile_data(rock_entity_type, rock_present_value, rock_destination_land_value)
                 # Moving onto an inactive chain tile.
                 elif rock_destination_land_value == chain_inactive_value:
-                    brane_state[0][rock_destination_index] = create_tile_data(rock_entity_type, rock_present_value, chain_active_value)
+                    game_state[0][rock_destination_index] = create_tile_data(rock_entity_type, rock_present_value, chain_active_value)
                 # Moving onto an ACTIVE chain tile.
                 elif rock_destination_land_value == chain_active_value:
-                    trigger_chain_disperse(brane_state[0], rock_destination_index)
+                    trigger_chain_disperse(game_state[0], rock_destination_index)
                     
-                    if not state_space:
-                        if not is_brand_carved(brane_state[0], brand_dicts[chosen_brand]) and get_player_index(brane_state[0], handling_absent_case=True) == -1:
+                    if get_player_index(game_state[0], handling_absent_case=True) == -1:
+                        if not state_space and not is_brand_carved(game_state[0], brand_dicts[chosen_brand]) and :
                             print("Error! Death by remote chain dispersion??")
                             death_flag = True
+                            
+                    game_state[0] = eliminate_monster_statues(game_state[0])
                         
-                    return brane_state
+                    return game_state
                 # Unhandled tile type.
                 else:
                     raise ValueError("Error! Cannot resolve world state!1 " + input + " " + str(rock_destination_land_value))
                     return "???"
+                    
+                # Destroy monster statues if need be.
+                game_state[0] = eliminate_monster_statues(game_state[0])
+                    
+                ## Corner true-rocks are walls.
+                if (rock_destination_index == 0 or rock_destination_index == 5 or rock_destination_index == 30 or rock_destination_index == 35) and get_rock_value_from_tile(full_moving_tile_data) == rock_present_value and get_land_value_from_tile(game_state[0][rock_destination_index]) != chain_active_value:
+                    game_state[0][rock_destination_index] = wall_value
         else:
             # Update glass and chain counters.
             if (moving_land_data == glass_value):
@@ -1437,65 +1471,65 @@ def brane_walk(brane_state: list[list], input: str, state_space = False):
             # Tile we're moving into is a pit. (Or an active chain, which is similar.)
             if moving_land_data == void_value or moving_land_data == chain_active_value:
                 # Moving into a pit is a death sentence.
-                if not wings or (wings and floating(brane_state[0])):
+                if not wings or (wings and floating(game_state[0])):
                     # Remove player from source tile
                     if player_land_data == glass_value:
-                        brane_state[0][player_index] = void_value
+                        game_state[0][player_index] = void_value
                     else:
-                        brane_state[0][player_index] = create_tile_data(0, 0, player_land_data)
+                        game_state[0][player_index] = create_tile_data(0, 0, player_land_data)
                     
                     # If the tile we're moving into is an active chain, trigger a dispersion.
                     if moving_land_data == chain_active_value:
                         if moving_tile_index == -1:
                             raise ValueError("3moving_tile_index == -1 and was attempted to be used as an index")
-                        trigger_chain_disperse(brane_state[0], moving_tile_index)
+                        trigger_chain_disperse(game_state[0], moving_tile_index)
                     
                     if state_space:
-                        return brane_state
+                        return game_state
                     else:
                         # Final check to see if the brand is carved by this final action.
-                        if not is_brand_carved(brane_state[0], brand_dicts[chosen_brand]):
+                        if not is_brand_carved(game_state[0], brand_dicts[chosen_brand]):
                             print("Error! Death by pit??")
                             death_flag = True
                 # nah bro we good I got wings and I'm not floating either
                 else:
                     # Remove player from source tile
                     if player_land_data == glass_value:
-                        brane_state[0][player_index] = void_value
+                        game_state[0][player_index] = void_value
                     else:
-                        brane_state[0][player_index] = create_tile_data(0, 0, player_land_data)
+                        game_state[0][player_index] = create_tile_data(0, 0, player_land_data)
                     
                     # Disperse chains
                     if moving_land_data == chain_active_value:
                         if moving_tile_index == -1:
                             raise ValueError("4moving_tile_index == -1 and was attempted to be used as an index")
-                        trigger_chain_disperse(brane_state[0], moving_tile_index)
+                        trigger_chain_disperse(game_state[0], moving_tile_index)
                     
                     # Add player to destination tile
                     if moving_tile_index == -1:
                         raise ValueError("5moving_tile_index == -1 and was attempted to be used as an index")
-                    brane_state[0][moving_tile_index] = create_tile_data(1, direction_letter_to_number(input), 0)
+                    game_state[0][moving_tile_index] = create_tile_data(1, direction_letter_to_number(input), 0)
             # Tile is a solid tile, glass, chain, button, or walkable stairs.
-            elif moving_land_data == white_value or moving_land_data == glass_value or moving_land_data == chain_inactive_value or moving_land_data == button_value or (moving_land_data == exit_value and not stairs_exitable_question(brane_state[0])):
+            elif moving_land_data == white_value or moving_land_data == glass_value or moving_land_data == chain_inactive_value or moving_land_data == button_value or (moving_land_data == exit_value and not stairs_exitable_question(game_state[0])):
                 steps_since_last_bump += 1
                 
                 # Remove player from source tile
                 if player_land_data == glass_value:
-                    brane_state[0][player_index] = void_value
+                    game_state[0][player_index] = void_value
                 else:
-                    brane_state[0][player_index] = create_tile_data(0, 0, player_land_data)
+                    game_state[0][player_index] = create_tile_data(0, 0, player_land_data)
                     
                 # Add player to destination tile
                 if moving_land_data == chain_inactive_value:
                     if moving_tile_index == -1:
                         raise ValueError("6moving_tile_index == -1 and was attempted to be used as an index")
-                    brane_state[0][moving_tile_index] = create_tile_data(1, direction_letter_to_number(input), chain_active_value)
+                    game_state[0][moving_tile_index] = create_tile_data(1, direction_letter_to_number(input), chain_active_value)
                 else:
                     if moving_tile_index == -1:
                         raise ValueError("7moving_tile_index == -1 and was attempted to be used as an index")
-                    brane_state[0][moving_tile_index] = create_tile_data(1, direction_letter_to_number(input), moving_land_data)
+                    game_state[0][moving_tile_index] = create_tile_data(1, direction_letter_to_number(input), moving_land_data)
             # Tile we're moving into is active stairs.
-            elif moving_land_data == exit_value and stairs_exitable_question(brane_state[0]):
+            elif moving_land_data == exit_value and stairs_exitable_question(game_state[0]):
                 print("Error! Death by stairs??")
                 death_flag = True
                 return "death"
@@ -1503,14 +1537,14 @@ def brane_walk(brane_state: list[list], input: str, state_space = False):
             elif moving_land_data == wall_value:
                 steps_since_last_bump = 0
                 
-                if floating(brane_state[0]):
+                if floating(game_state[0]):
                     print("Error! Death by wing pushing??")
                     death_flag = True
                     
-                    brane_state[player_index] = void_value
-                    return brane_state
+                    game_state[player_index] = void_value
+                    return game_state
                 else:
-                    brane_state[player_index] = create_tile_data(1, direction_letter_to_number(input), player_land_data)
+                    game_state[player_index] = create_tile_data(1, direction_letter_to_number(input), player_land_data)
             else:
                 raise ValueError("Error! Cannot resolve world state!2 " + input + " " + str(moving_land_data))
                 return "???"
@@ -1518,7 +1552,7 @@ def brane_walk(brane_state: list[list], input: str, state_space = False):
         raise ValueError("Error! Cannot resolve world state!3 " + input)
         return "???"
         
-    return brane_state
+    return game_state
 
 ## The dictionaries! ##
 player_down_solid = create_tile_data(1, 1, white_value)
@@ -1530,6 +1564,9 @@ rockless_button = create_tile_data(0, 0, button_value)
 rock_on_land = create_tile_data(rock_entity_type, rock_present_value, white_value)
 hand_on_glass = create_tile_data(rock_entity_type, hands_present_value, glass_value)
 rock_on_glass = create_tile_data(rock_entity_type, rock_present_value, glass_value)
+
+monster_statue_on_land = create_tile_data(rock_entity_type, monster_statue_value, white_value)
+watcher_on_land = create_tile_data(rock_entity_type, watcher_statue_value, white_value)
 
 brane_dicts = {
     "add": [
@@ -1569,11 +1606,11 @@ brane_dicts = {
     ],
     ## This is spaghetti
     "tan": [
-        rock_on_land, hand_on_glass, player_down_solid, white_value, hand_on_glass, rock_on_land,
+        monster_statue_on_land, hand_on_glass, player_down_solid, white_value, hand_on_glass, monster_statue_on_land,
         hand_on_glass, hand_on_glass, white_value, white_value, hand_on_glass, hand_on_glass,
-        rock_on_land, hand_on_glass, rock_on_land, rock_on_land, hand_on_glass, rock_on_land,
+        monster_statue_on_land, hand_on_glass, monster_statue_on_land, monster_statue_on_land, hand_on_glass, monster_statue_on_land,
         white_value, white_value, exit_value, hand_on_glass, white_value, white_value,
-        white_value, hand_on_glass, rock_on_land, white_value, hand_on_glass, white_value,
+        white_value, hand_on_glass, monster_statue_on_land, white_value, hand_on_glass, white_value,
         white_value, white_value, hand_on_glass, hand_on_glass, white_value, white_value,
     ],
     "gor": [
@@ -1587,10 +1624,10 @@ brane_dicts = {
     "lev": [
         wall_value, chain_inactive_value, chain_inactive_value, exit_value, white_value, player_down_solid,
         chain_inactive_value, chain_inactive_value, white_value, white_value, white_value, white_value,
-        white_value, chain_inactive_value, chain_inactive_value, rock_on_land, chain_inactive_value, chain_inactive_value,
+        white_value, chain_inactive_value, chain_inactive_value, watcher_on_land, chain_inactive_value, chain_inactive_value,
         chain_inactive_value, chain_inactive_value, white_value, white_value, chain_inactive_value, chain_inactive_value,
         chain_inactive_value, chain_inactive_value, chain_inactive_value, chain_inactive_value, chain_inactive_value, white_value,
-        wall_value, white_value, chain_inactive_value, chain_inactive_value, white_value, white_value
+        watcher_on_land, white_value, chain_inactive_value, chain_inactive_value, white_value, white_value
     ],
     "cif": [
         wall_value, white_value, void_value, void_value, void_value, wall_value,
@@ -1837,6 +1874,31 @@ while True:
     bad_solutions_distance.clear()
     weirdo_flag = False
     
+    # Blegh
+    def pickle_name():
+        if sword:
+            if wings:
+                if endless:
+                    return "game_state_sword_winged_endless"
+                else:
+                    return "game_state_sword_winged_finite"
+            else:
+                if endless:
+                    return "game_state_sword_wingless_endless"
+                else:
+                    return "game_state_sword_wingless_finite"
+        else:
+            if wings:
+                if endless:
+                    return "game_state_swordless_winged_endless"
+                else:
+                    return "game_state_swordless_winged_finite"
+            else:
+                if endless:
+                    return "game_state_swordless_wingless_endless"
+                else:
+                    return "game_state_swordless_wingless_finite"
+    
     # For testing/bulking up the cache.
     if random_brane_generation:
         while True:
@@ -1845,10 +1907,7 @@ while True:
             
             import pickle
             try:
-                if wings:
-                    movement_state_dictionary = pickle.load(open('movement_winged.pkl', 'rb'))
-                else:
-                    movement_state_dictionary = pickle.load(open('movement_wingless.pkl', 'rb'))
+                movement_state_dictionary = pickle.load(open(pickle_name()+'.pkl', 'rb'))
             except FileNotFoundError:
                 pass
             except (e):
@@ -1859,7 +1918,7 @@ while True:
                 b = random_brane()
                 print(display_brane(b))
                 
-                movement_state_dictionary[hashable_brane_state(b)] = [
+                movement_state_dictionary[hashable_game_state(b)] = [
                     brane_walk(list(b), "D", True),
                     brane_walk(list(b), "L", True),
                     brane_walk(list(b), "U", True),
@@ -1867,17 +1926,11 @@ while True:
                 ]
                 
                 if x % 100 == 0:
-                    if wings:
-                        pickle.dump(movement_state_dictionary, open('movement_winged.pkl', 'wb'))
-                    else:
-                        pickle.dump(movement_state_dictionary, open('movement_wingless.pkl', 'wb'))
+                    pickle.dump(movement_state_dictionary, open(pickle_name()+'.pkl', 'wb'))
                 
                 x += 1
             
-            if wings:
-                pickle.dump(movement_state_dictionary, open('movement_winged.pkl', 'wb'))
-            else:
-                pickle.dump(movement_state_dictionary, open('movement_wingless.pkl', 'wb'))
+            pickle.dump(movement_state_dictionary, open(pickle_name()+'.pkl', 'wb'))
                 
             print(str(time.time() - stopwatch))
             notice = input("Made a bunch for ya, boss.")
@@ -1930,14 +1983,13 @@ while True:
             # Attempt to load our pickled dictionary.
             import pickle
             try:
-                if wings:
-                    movement_state_dictionary = pickle.load(open('movement_winged.pkl', 'rb'))
-                else:
-                    movement_state_dictionary = pickle.load(open('movement_wingless.pkl', 'rb'))
+                movement_state_dictionary = pickle.load(open(pickle_name()+'.pkl', 'rb'))
             except FileNotFoundError:
                 pass
             except (e):
                 raise e
+                
+            ## A node is defined as a "game state", a tuple containing first the brane state, then the held tiles. Together, these uniquely define a game position. (The changed applied by the wings, sword, and void rod are situational and handled separately.)
                 
             # Keep a set of all visited nodes. If we ever re-visit them, we ignore it.
             visited_nodes = set()
@@ -1977,7 +2029,7 @@ while True:
                             # Do something
                         
                         # The cache dictionary needs a hashable form of the brane state.
-                        hashabled_node = hashable_brane_state(node)
+                        hashabled_node = hashable_game_state(node)
                         
                         # Establish cache value if needed.
                         if hashabled_node not in movement_state_dictionary:
@@ -2083,7 +2135,7 @@ while True:
                     break
                 
                 ## YOUR TAKING TOO LONG
-                if not here_be_monsters_question(brane_dicts[chosen_brane]):
+                if not here_be_moving_monsters_question(brane_dicts[chosen_brane]):
                     print("Trimming down repetitive movements...")
                     
                     # High-level theft of a Nintendo console.
