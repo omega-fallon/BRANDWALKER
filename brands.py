@@ -1879,25 +1879,25 @@ while True:
         if sword:
             if wings:
                 if endless:
-                    return "game_state_sword_winged_endless"
+                    return "movement_dicts/game_state_sword_winged_endless.pkl"
                 else:
-                    return "game_state_sword_winged_finite"
+                    return "movement_dicts/game_state_sword_winged_finite.pkl"
             else:
                 if endless:
-                    return "game_state_sword_wingless_endless"
+                    return "movement_dicts/game_state_sword_wingless_endless.pkl"
                 else:
-                    return "game_state_sword_wingless_finite"
+                    return "movement_dicts/game_state_sword_wingless_finite.pkl"
         else:
             if wings:
                 if endless:
-                    return "game_state_swordless_winged_endless"
+                    return "movement_dicts/game_state_swordless_winged_endless.pkl"
                 else:
-                    return "game_state_swordless_winged_finite"
+                    return "movement_dicts/game_state_swordless_winged_finite.pkl"
             else:
                 if endless:
-                    return "game_state_swordless_wingless_endless"
+                    return "movement_dicts/game_state_swordless_wingless_endless.pkl"
                 else:
-                    return "game_state_swordless_wingless_finite"
+                    return "movement_dicts/game_state_swordless_wingless_finite.pkl"
     
     # For testing/bulking up the cache.
     if random_brane_generation:
@@ -1907,7 +1907,7 @@ while True:
             
             import pickle
             try:
-                movement_state_dictionary = pickle.load(open(pickle_name()+'.pkl', 'rb'))
+                movement_state_dictionary = pickle.load(open(pickle_name(), 'rb'))
             except FileNotFoundError:
                 pass
             except (e):
@@ -1926,11 +1926,11 @@ while True:
                 ]
                 
                 if x % 100 == 0:
-                    pickle.dump(movement_state_dictionary, open(pickle_name()+'.pkl', 'wb'))
+                    pickle.dump(movement_state_dictionary, open(pickle_name(), 'wb'))
                 
                 x += 1
             
-            pickle.dump(movement_state_dictionary, open(pickle_name()+'.pkl', 'wb'))
+            pickle.dump(movement_state_dictionary, open(pickle_name(), 'wb'))
                 
             print(str(time.time() - stopwatch))
             notice = input("Made a bunch for ya, boss.")
@@ -1983,14 +1983,14 @@ while True:
             # Attempt to load our pickled dictionary.
             import pickle
             try:
-                movement_state_dictionary = pickle.load(open(pickle_name()+'.pkl', 'rb'))
+                movement_state_dictionary = pickle.load(open(pickle_name(), 'rb'))
             except FileNotFoundError:
                 pass
             except (e):
                 raise e
                 
             ## A node is defined as a "game state", a tuple containing first the brane state, then the held tiles. Together, these uniquely define a game position. (The changed applied by the wings, sword, and void rod are situational and handled separately.)
-                
+            
             # Keep a set of all visited nodes. If we ever re-visit them, we ignore it.
             visited_nodes = set()
             
@@ -1998,51 +1998,52 @@ while True:
             path_from_beginning_to_current_node = []
                 
             # Begin our search at the very beginning, holding nothing.
-            nodes_to_check = {"start": { [brane_dicts[chosen_brane],[]] } }
+            nodes_to_check = {}
+            next_nodex_to_check = {[brane_dicts[chosen_brane],[]]}
             
-            # The nodes to check on the NEXT iteration of the big loop.
-            branches_to_check_next = dict()
+            while next_nodex_to_check != {}:
+                nodes_to_check = set(next_nodex_to_check)
+                nodes_to_check = nodes_to_check - visited_nodes
+                next_nodex_to_check.clear()
                 
-            # Iterate
-            while True:
-                path_root_this_iteration = []
-                
-                # Iterate through each branch.
-                for branch in nodes_to_check:
-                    # The path needed to go from the beginning to this branch's root node.
-                    branch_path = path_root_this_iteration+branch
+                # Iterate through each node.
+                for node in nodes_to_check: 
+                    # Check if we've been here before. If so, no need to recalculate.
+                    if node in visited_nodes:
+                        continue
                     
-                    # Iterate through each leaf.
-                    for node in nodes_to_check[branch]: 
-                        # Check if we've been here before. If so, no need to recalculate.
-                        if node in visited_nodes:
-                            continue
+                    # Establish having been here.
+                    visited_nodes.add(node)
+                    
+                    # Check to see if this node is solved.
+                    if is_brand_carved(node[0], brand_dicts[chosen_brand]):
+                        # Do something
+                        while True:
+                            print("WE DID IT WE DID IT")
+                            print("no path available haven't coded it yet WEH")
+                            notice = input("")
+                    
+                    # The cache dictionary needs a hashable form of the brane state.
+                    hashabled_node = hashable_game_state(node)
+                    
+                    # Establish cache value if needed.
+                    if hashabled_node not in movement_state_dictionary:
+                        movement_state_dictionary[hashabled_node] = [
+                            brane_walk(list(node), "D", True),
+                            brane_walk(list(node), "L", True),
+                            brane_walk(list(node), "U", True),
+                            brane_walk(list(node), "R", True),
+                            brane_walk(list(node), "Z", True),
+                        ]
                         
-                        # Establish having been here.
-                        visited_nodes.add(node)
-                        
-                        # Keep path updated.
-                        path_from_beginning_to_current_node = path_root_this_iteration+[node]
-                        
-                        # Check to see if this node is solved.
-                        if is_brand_carved(node, brand_dicts[chosen_brand]):
-                            # Do something
-                        
-                        # The cache dictionary needs a hashable form of the brane state.
-                        hashabled_node = hashable_game_state(node)
-                        
-                        # Establish cache value if needed.
-                        if hashabled_node not in movement_state_dictionary:
-                            movement_state_dictionary[hashabled_node] =  = [
-                                brane_walk(list(node), "D", True),
-                                brane_walk(list(node), "L", True),
-                                brane_walk(list(node), "U", True),
-                                brane_walk(list(node), "R", True),
-                                brane_walk(list(node), "Z", True),
-                            ]
-                        
-                        # Search this node's neighbors.
-                        branches_to_check_next[node] = {movement_state_dictionary[hashabled_node][0],movement_state_dictionary[hashabled_node][1],movement_state_dictionary[hashabled_node][2],movement_state_dictionary[hashabled_node][3],movement_state_dictionary[hashabled_node][4]}
+                    # Add neighbors to list.
+                    for i in range(5):
+                        store = movement_state_dictionary[hashabled_node][i]
+                        if type(store) is not str and store not in visited_nodes:
+                            next_nodex_to_check.add(movement_state_dictionary[hashabled_node][i])
+        
+            while True:
+                notice = input("Exhaustively searched. No solution found. Proved impossible unless something went wrong.")
         else:
             if working_moves != "":
                 #if len(bad_solutions) > 0 and working_moves == bad_solutions[-1]:
