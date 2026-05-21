@@ -2045,7 +2045,7 @@ while True:
                     for i in range(5):
                         store = movement_state_dictionary[hashabled_node][i]
                         if type(store) is not str and store not in visited_nodes:
-                            next_nodes_to_check.add(hashabled_node(movement_state_dictionary[hashabled_node][i]))
+                            next_nodes_to_check.add(hashable_game_state(store))
         
             while True:
                 notice = input("Exhaustively searched. No solution found. Proved impossible unless something went wrong.")
