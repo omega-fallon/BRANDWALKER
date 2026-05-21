@@ -336,6 +336,7 @@ def get_right_tile_land_value(brane_state: list[int]):
     return get_land_value_from_tile(tile_in_direction_of_player(brane_state,"R"))
 
 ## Returns true if the void rod can take a file.
+held_tiles = []
 def void_rod_can_take(passed_tiles = held_tiles):
     return len(passed_tiles) == 0 or endless
 
@@ -369,7 +370,7 @@ def here_be_moving_monsters_question(brane_state: list[int]):
     return False
     
 ## Returns true if there any monsters in the brane, INCLUDING hands, hands!
-def here_be_monsters_questionbrane_state: list[int]):
+def here_be_monsters_question(brane_state: list[int]):
     for i in range(36):
         if get_entity_type_from_tile(brane_state[i]) == beaver_entity_type or get_entity_type_from_tile(brane_state[i]) == mimic_entity_type or get_rock_value_from_tile(brane_state[i]) == hands_present_value:
             return True
@@ -875,7 +876,7 @@ def prove_void_lord(brane_state: list[int]):
 
 ## Given a brane state_ removes any monster statues if there are no monsters present.
 def eliminate_monster_statues(brane_state: list[int]):
-    if here_be_monsters_questionbrane_state):
+    if here_be_monsters_question(brane_state):
         for i in range(36):
             if get_rock_value_from_tile(brane_state[i]) == monster_statue_value:
                 brane_state[i] = create_tile_data(0, 0, get_land_value_from_tile(brane_state[i]))
@@ -1443,7 +1444,7 @@ def brane_walk(game_state: list[list], input: str, state_space = False):
                     trigger_chain_disperse(game_state[0], rock_destination_index)
                     
                     if get_player_index(game_state[0], handling_absent_case=True) == -1:
-                        if not state_space and not is_brand_carved(game_state[0], brand_dicts[chosen_brand]) and :
+                        if not state_space and not is_brand_carved(game_state[0], brand_dicts[chosen_brand]):
                             print("Error! Death by remote chain dispersion??")
                             death_flag = True
                             
@@ -1980,6 +1981,10 @@ while True:
         
         # This changes the way the entire program works.
         if breadth_first_state_space_search:
+            # Specific functions.
+            def unhash_node(node: int):
+                string = "{0:b}".format(node)
+            
             # Attempt to load our pickled dictionary.
             import pickle
             try:
@@ -1999,12 +2004,12 @@ while True:
                 
             # Begin our search at the very beginning, holding nothing.
             nodes_to_check = {}
-            next_nodex_to_check = {[brane_dicts[chosen_brane],[]]}
+            next_nodes_to_check = {hashabled_node([brane_dicts[chosen_brane],[]])}
             
-            while next_nodex_to_check != {}:
-                nodes_to_check = set(next_nodex_to_check)
+            while next_nodes_to_check != {}:
+                nodes_to_check = set(next_nodes_to_check)
                 nodes_to_check = nodes_to_check - visited_nodes
-                next_nodex_to_check.clear()
+                next_nodes_to_check.clear()
                 
                 # Iterate through each node.
                 for node in nodes_to_check: 
@@ -2016,7 +2021,7 @@ while True:
                     visited_nodes.add(node)
                     
                     # Check to see if this node is solved.
-                    if is_brand_carved(node[0], brand_dicts[chosen_brand]):
+                    if is_brand_carved(brane_state_from_hasabled_node(node), brand_dicts[chosen_brand]):
                         # Do something
                         while True:
                             print("WE DID IT WE DID IT")
@@ -2029,18 +2034,18 @@ while True:
                     # Establish cache value if needed.
                     if hashabled_node not in movement_state_dictionary:
                         movement_state_dictionary[hashabled_node] = [
-                            brane_walk(list(node), "D", True),
-                            brane_walk(list(node), "L", True),
-                            brane_walk(list(node), "U", True),
-                            brane_walk(list(node), "R", True),
-                            brane_walk(list(node), "Z", True),
+                            brane_walk(unhash_node(node), "D", True),
+                            brane_walk(unhash_node(node), "L", True),
+                            brane_walk(unhash_node(node), "U", True),
+                            brane_walk(unhash_node(node), "R", True),
+                            brane_walk(unhash_node(node), "Z", True),
                         ]
                         
-                    # Add neighbors to list.
+                    # Add neighbors to set.
                     for i in range(5):
                         store = movement_state_dictionary[hashabled_node][i]
                         if type(store) is not str and store not in visited_nodes:
-                            next_nodex_to_check.add(movement_state_dictionary[hashabled_node][i])
+                            next_nodes_to_check.add(hashabled_node(movement_state_dictionary[hashabled_node][i]))
         
             while True:
                 notice = input("Exhaustively searched. No solution found. Proved impossible unless something went wrong.")
