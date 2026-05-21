@@ -851,6 +851,15 @@ def safe_choice_list(brane_state: list[int], stupid_flaggot: bool = False):
     
     return stupid_horse
 
+## Returns the binary representation of a number padded to 3 digits.
+def pad_3_bin(x: int):
+    string = bin(x)
+    if len(string) > 3:
+        raise ValueError("it's too big 😖")
+    while len(string) < 3:
+        string = "0"+string
+    return string
+
 ## Given a brane state, converts to a hashable (dictionary key–valid) form
 def hashable_game_state(game_state: list[list]):
     # New rules!
@@ -862,9 +871,9 @@ def hashable_game_state(game_state: list[list]):
     
     string = ""
     for i in range(36):
-        string += bin(game_state[0][i])
+        string += pad_3_bin(game_state[0][i])
     for i in range(len(game_state[1])):
-        string += bin(game_state[1][i])
+        string += pad_3_bin(game_state[1][i])
         
     return int(string,2)
 
