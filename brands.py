@@ -166,16 +166,18 @@ def get_land_value_from_tile(x: int):
 
 ## Given a brane state and a brand, returns true if the brand is currently successfully carved.
 def is_brand_carved(brane_state: list[int], brand: list[int]):
-    ## First, validate the inputs to avoid any dumb mistakes.
+    if len(brane_state) != 36:
+        raise ValueError("brane_state is not 36 tiles large")
+
     for i in range(36):
+        ## First, validate the inputs to avoid any dumb mistakes.
         if brane_state[i] < 0 or brane_state[i] > create_tile_data(base_value-1, base_value-1, base_value-1):
             raise ValueError("Error! Invalid brane_state input in is_brand_carved()! " + display_brane(brane_state))
 
         if brand[i] != 0 and brand[i] != 1:
             raise ValueError("Error! Invalid brand input in is_brand_carved! " + str(brand))
-
-    ## Now, check in earnest.
-    for i in range(36):
+        
+        ## Now, check in earnest.
         i_brane_state_land = get_land_value_from_tile(brane_state[i])
         if i_brane_state_land == void_value and brand[i] == 0:
             continue
@@ -851,32 +853,6 @@ def safe_choice_list(brane_state: list[int], stupid_flaggot: bool = False):
     
     return stupid_horse
 
-## Returns the binary representation of a number padded to 3 digits.
-def pad_3_bin(x: int):
-    string = bin(x)
-    if len(string) > 3:
-        raise ValueError("it's too big 😖")
-    while len(string) < 3:
-        string = "0"+string
-    return string
-
-## Given a brane state, converts to a hashable (dictionary key–valid) form
-def hashable_game_state(game_state: list[list]):
-    # New rules!
-    if len(game_state) != 2 or type(game_state[0]) is not list or type(game_state[1]) is not list:
-        raise ValueError("hashable_game_state passed a brane state and not a game state.")
-    
-    if len(game_state[0]) != 36:
-        raise ValueError("hashable_game_state passed an invalid-length tile state.")
-    
-    string = ""
-    for i in range(36):
-        string += pad_3_bin(game_state[0][i])
-    for i in range(len(game_state[1])):
-        string += pad_3_bin(game_state[1][i])
-        
-    return int(string,2)
-
 ## Given a brane layout, checks to see if there's anything that can definitively prove which brand room we're in. If it can, it returns that Void Lord's name, otherwise it returns an empty string.
 def prove_void_lord(brane_state: list[int]):
     # fill in
@@ -1306,16 +1282,29 @@ def brane_walk(game_state: list[list], input: str, state_space = False):
     global death_flag, working_moves, steps_since_last_glass, steps_since_last_bump, steps_since_last_chain
     
     ## Validation.
+    if type(game_state) is int or type(game_state) is str:
+        raise ValueError("brane_walk passed a hashabled node")
+    
     if len(game_state) != 2 or type(game_state[0]) is not list or type(game_state[1]) is not list:
         raise ValueError("brane_walk passed a brane state and not a game state.")
     
     if len(game_state[0]) != 36:
         raise ValueError("brane_walk passed an invalid-length tile state.")
+        
+    if not endless and len(game_state[1]) > 1:
+        raise ValueError("brane_walk passed multi-tile held without endless.")
     
-    ## Update glass & chain counter.
-    player_index = get_player_index(game_state[0])
+    ## Get player index
+    if state_space:
+        try:
+            player_index = get_player_index(game_state[0])
+        except:
+            return game_state
+    else:
+        player_index = get_player_index(game_state[0])
     player_land_data = get_land_value_from_tile(game_state[0][player_index])
     
+    ## Update glass & chain counter.
     if (player_land_data == glass_value):
         steps_since_last_glass = 0
     else:
@@ -1342,7 +1331,7 @@ def brane_walk(game_state: list[list], input: str, state_space = False):
                 death_flag = True
             
             if state_space:
-                 "self"
+                return game_state
             else:
                 working_moves = working_moves[:-1]
         # Tile is valid for pickup.
@@ -1368,7 +1357,7 @@ def brane_walk(game_state: list[list], input: str, state_space = False):
             if safe_choices == ["Z"]:
                 print("Only valid move is Z but Z does nothing. Resetting...")
                 death_flag = True
-            return "self"
+            return game_state
             
             working_moves = working_moves[:-1]
     elif (input == "D" or input == "L" or input == "U" or input == "R"):
@@ -1385,7 +1374,7 @@ def brane_walk(game_state: list[list], input: str, state_space = False):
         if get_rock_value_from_tile(full_moving_tile_data) == hands_present_value:
             print("Error! Death by hand?? Hands?!!")
             death_flag = True
-            return "death"
+            return game_state
         # Moving into a rock or statue.
         elif get_rock_value_from_tile(full_moving_tile_data) != 0:
             steps_since_last_bump = 0
@@ -1542,7 +1531,7 @@ def brane_walk(game_state: list[list], input: str, state_space = False):
             elif moving_land_data == exit_value and stairs_exitable_question(game_state[0]):
                 print("Error! Death by stairs??")
                 death_flag = True
-                return "death"
+                return game_state
             # Tile is a wall. This is basically the same as solid tile except we only change the facing direction.
             elif moving_land_data == wall_value:
                 steps_since_last_bump = 0
@@ -1990,9 +1979,121 @@ while True:
         
         # This changes the way the entire program works.
         if breadth_first_state_space_search:
-            # Specific functions.
-            def unhash_node(node: int):
-                string = "{0:b}".format(node)
+            ## Specific functions.
+            # Given a brane state, converts to a hashable (dictionary key–valid) form
+            def A_hashable_game_state(game_state: list[list]):
+                # New rules!
+                if type(game_state) is int:
+                    raise ValueError("hashable_game_state passed an already hashabled game state")
+                
+                if len(game_state) != 2 or type(game_state[0]) is not list or type(game_state[1]) is not list:
+                    raise ValueError("hashable_game_state passed a brane state and not a game state.")
+                
+                if len(game_state[0]) != 36:
+                    raise ValueError("hashable_game_state passed an invalid-length tile state.")
+                
+                string = ""
+                for i in range(36):
+                    string += pad_9_bin(game_state[0][i])
+                for i in range(len(game_state[1])):
+                    string += pad_3_bin(game_state[1][i])
+                    
+                return int(string,2)
+                
+            ## Returns the binary representation of a number padded to 3 digits.
+            def pad_3_bin(x: int):
+                string = bin(x).replace("0b","")
+                if len(string) > bits_per_variable:
+                    raise ValueError("it's too big 😖",string)
+                while len(string) < bits_per_variable:
+                    string = "0"+string
+                return string
+                
+            ## Returns the binary representation of a number padded to 9 digits.
+            def pad_9_bin(x: int):
+                string = bin(x).replace("0b","")
+                if len(string) > bits_per_variable*3:
+                    raise ValueError("it's too big 😖",string)
+                while len(string) < bits_per_variable*3:
+                    string = "0"+string
+                return string
+                
+            ## Converts bitstring to binary properly.
+            def read_proper_binary(x: str):
+                store = int("0"+x,2)
+                
+                if store < 0:
+                    raise ValueError("read_proper_binary got negative value",x,store)
+                    
+                return store
+            
+            # Given a hashabled node, returns the brane state only.
+            def A_brane_state_from_hasabled_node(node: int):
+                if type(node) is not int:
+                    raise ValueError("unhashablize_node given non-int")
+                
+                string = ("{0:b}".format(node)).replace("0b","")
+                
+                array = []
+                for i in range(36):
+                    array.append(read_proper_binary(string[0+i*9:9+i*9]))
+                    
+                return array
+            
+            # Given a hashabled node, returns the whole game state.
+            def A_unhashablize_node(node: int):
+                if type(node) is not int:
+                    raise ValueError("unhashablize_node given non-int")
+                
+                string = ("{0:b}".format(node)).replace("0b","")
+                
+                if len(string) < 36*9-8:
+                    raise ValueError("unhashablize_node given stupid number",node,string)
+                else:
+                    while len(string) < 36*9:
+                        string = "0"+string
+                
+                tiles = []
+                
+                if len(string) > 36*9:
+                    working = string[36*9:]
+                    
+                    if len(working) % 3 != 0:
+                        raise ValueError("unhashablize_node invalid tile data: "+str(node)+" "+string)
+                        
+                    for i in range(len(working) / 3):
+                        array.append(read_proper_binary(string[0+i*3:3+i*3]))
+                
+                return [A_brane_state_from_hasabled_node(node), tiles]
+            
+            ## Try another way. ##
+            import json
+            def B_hashable_game_state(game_state: list[list]):
+                # New rules!
+                if type(game_state) is int:
+                    raise ValueError("hashable_game_state passed an already hashabled game state")
+                
+                if len(game_state) != 2 or type(game_state[0]) is not list or type(game_state[1]) is not list:
+                    raise ValueError("hashable_game_state passed a brane state and not a game state.")
+                
+                if len(game_state[0]) != 36:
+                    raise ValueError("hashable_game_state passed an invalid-length tile state.")
+                    
+                return json.dumps(game_state)
+                
+            # Given a hashabled node, returns the brane state only.
+            def B_brane_state_from_hasabled_node(node: str):
+                if type(node) is not str:
+                    raise ValueError("B_brane_state_from_hasabled_node given non-str")
+                
+                return json.loads(node)[0]
+                
+            # Given a hashabled node, returns the whole game state.
+            def B_unhashablize_node(node: str):
+                if type(node) is not str:
+                    raise ValueError("B_unhashablize_node given non-str")
+                    
+                return json.loads(node)
             
             # Attempt to load our pickled dictionary.
             import pickle
@@ -2000,25 +2101,41 @@ while True:
                 movement_state_dictionary = pickle.load(open(pickle_name(), 'rb'))
             except FileNotFoundError:
                 pass
-            except (e):
-                raise e
+            except EOFError:
+                pass
+            except:
+                raise "Who knows?"
                 
             ## A node is defined as a "game state", a tuple containing first the brane state, then the held tiles. Together, these uniquely define a game position. (The changed applied by the wings, sword, and void rod are situational and handled separately.)
             
             # Keep a set of all visited nodes. If we ever re-visit them, we ignore it.
-            visited_nodes = set()
+            visited_nodes = set([])
             
             # Keep this path always updated.
             path_from_beginning_to_current_node = []
                 
             # Begin our search at the very beginning, holding nothing.
-            nodes_to_check = {}
-            next_nodes_to_check = {hashabled_node([brane_dicts[chosen_brane],[]])}
+            nodes_to_check = set([])
+            next_nodes_to_check = {B_hashable_game_state([brane_dicts[chosen_brane],[]])}
             
-            while next_nodes_to_check != {}:
+            bfs = -1
+            print("Beginning breadth-first search.")
+            while len(next_nodes_to_check) > 0:
+                bfs += 1
+                print("BFS iteration",bfs)
+                
+                if combo_name() in known_solutions and bfs+1 > len(known_solutions[combo_name()]):
+                    raise "BFS exceeds known solution length. Something went very wrong. Deleting cache is recommended."
+                
+                pickle.dump(movement_state_dictionary, open(pickle_name(), 'wb'))
+                with open(pickle_name().replace(".pkl",".hrf"), "w", encoding="utf-8") as f:
+                    f.write(str(movement_state_dictionary).replace("]'], '[[","]'],\n\n'[["))
+                    
                 nodes_to_check = set(next_nodes_to_check)
                 nodes_to_check = nodes_to_check - visited_nodes
                 next_nodes_to_check.clear()
+                
+                print(nodes_to_check)
                 
                 # Iterate through each node.
                 for node in nodes_to_check: 
@@ -2030,34 +2147,40 @@ while True:
                     visited_nodes.add(node)
                     
                     # Check to see if this node is solved.
-                    if is_brand_carved(brane_state_from_hasabled_node(node), brand_dicts[chosen_brand]):
+                    if is_brand_carved(B_brane_state_from_hasabled_node(node), brand_dicts[chosen_brand]):
                         # Do something
                         while True:
                             print("WE DID IT WE DID IT")
                             print("no path available haven't coded it yet WEH")
                             notice = input("")
                     
-                    # The cache dictionary needs a hashable form of the brane state.
-                    hashabled_node = hashable_game_state(node)
-                    
                     # Establish cache value if needed.
-                    if hashabled_node not in movement_state_dictionary:
-                        movement_state_dictionary[hashabled_node] = [
-                            brane_walk(unhash_node(node), "D", True),
-                            brane_walk(unhash_node(node), "L", True),
-                            brane_walk(unhash_node(node), "U", True),
-                            brane_walk(unhash_node(node), "R", True),
-                            brane_walk(unhash_node(node), "Z", True),
+                    if node not in movement_state_dictionary:
+                        unhashed_node = B_unhashablize_node(node)
+                        
+                        movement_state_dictionary[node] = [
+                            B_hashable_game_state(brane_walk(list(unhashed_node), "D", True)),
+                            B_hashable_game_state(brane_walk(list(unhashed_node), "L", True)),
+                            B_hashable_game_state(brane_walk(list(unhashed_node), "U", True)),
+                            B_hashable_game_state(brane_walk(list(unhashed_node), "R", True)),
+                            B_hashable_game_state(brane_walk(list(unhashed_node), "Z", True)),
                         ]
                         
+                    elif len(movement_state_dictionary[node]) != 5:
+                        raise ValueError("Cache contains stupid non-5 array.")
+                        
                     # Add neighbors to set.
-                    for i in range(5):
-                        store = movement_state_dictionary[hashabled_node][i]
-                        if type(store) is not str and store not in visited_nodes:
-                            next_nodes_to_check.add(hashable_game_state(store))
+                    for x in movement_state_dictionary[node]:
+                        if x == "???":
+                            raise ValueError("Cache contains ???!")
+                        
+                        if x not in visited_nodes:
+                            next_nodes_to_check.add(x)
         
             while True:
-                notice = input("Exhaustively searched. No solution found. Proved impossible unless something went wrong.")
+                if combo_name() in known_solutions:
+                    print("Combination exists in known solutions. This is wrong.")
+                notice = input("\"Searched far and wide, have I. The boy's home does not exist.\"\nExhaustively searched. No solution found. Proved impossible unless something went wrong.")
         else:
             if working_moves != "":
                 #if len(bad_solutions) > 0 and working_moves == bad_solutions[-1]:
