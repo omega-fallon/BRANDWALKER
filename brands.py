@@ -1326,7 +1326,7 @@ def brane_walk(game_state: list[list], input: str, state_space = False):
                 
         # Is tile invalid for both pickup and placedown?
         elif full_faced_tile_data != faced_land_data or faced_land_data == wall_value: # (Explanation: this inequality means there is an entity on the tile, meaning an enemy or a rock. The second one is just checking if the tile is a wall, which is self-explanatory.) 
-            if safe_choices == ["Z"]:
+            if not state_space and safe_choices == ["Z"]:
                 print("Only valid move is Z but Z does nothing. Resetting...")
                 death_flag = True
             
@@ -1354,7 +1354,7 @@ def brane_walk(game_state: list[list], input: str, state_space = False):
             game_state[1].pop()
         # Cannot do anything.
         else:
-            if safe_choices == ["Z"]:
+            if not state_space and safe_choices == ["Z"]:
                 print("Only valid move is Z but Z does nothing. Resetting...")
                 death_flag = True
             return game_state
@@ -1372,8 +1372,9 @@ def brane_walk(game_state: list[list], input: str, state_space = False):
 
         # Moving into a hand (hands!)
         if get_rock_value_from_tile(full_moving_tile_data) == hands_present_value:
-            print("Error! Death by hand?? Hands?!!")
-            death_flag = True
+            if not state_space:
+                print("Error! Death by hand?? Hands?!!")
+                death_flag = True
             return game_state
         # Moving into a rock or statue.
         elif get_rock_value_from_tile(full_moving_tile_data) != 0:
@@ -1404,7 +1405,7 @@ def brane_walk(game_state: list[list], input: str, state_space = False):
             if floating(game_state[0]):
                 if not state_space:
                     print("Error! Death by wing pushing??")
-                death_flag = True
+                    death_flag = True
                 
                 game_state[0][player_index] = void_value
             else:
@@ -1529,21 +1530,23 @@ def brane_walk(game_state: list[list], input: str, state_space = False):
                     game_state[0][moving_tile_index] = create_tile_data(1, direction_letter_to_number(input), moving_land_data)
             # Tile we're moving into is active stairs.
             elif moving_land_data == exit_value and stairs_exitable_question(game_state[0]):
-                print("Error! Death by stairs??")
-                death_flag = True
+                if not state_space:
+                    print("Error! Death by stairs??")
+                    death_flag = True
                 return game_state
             # Tile is a wall. This is basically the same as solid tile except we only change the facing direction.
             elif moving_land_data == wall_value:
                 steps_since_last_bump = 0
                 
                 if floating(game_state[0]):
-                    print("Error! Death by wing pushing??")
-                    death_flag = True
+                    if not state_space:
+                        print("Error! Death by wing pushing??")
+                        death_flag = True
                     
-                    game_state[player_index] = void_value
+                    game_state[0][player_index] = void_value
                     return game_state
                 else:
-                    game_state[player_index] = create_tile_data(1, direction_letter_to_number(input), player_land_data)
+                    game_state[0][player_index] = create_tile_data(1, direction_letter_to_number(input), player_land_data)
             else:
                 raise ValueError("Error! Cannot resolve world state!2 " + input + " " + str(moving_land_data))
                 return "???"
@@ -2111,8 +2114,8 @@ while True:
             # Keep a set of all visited nodes. If we ever re-visit them, we ignore it.
             visited_nodes = set([])
             
-            # Keep this path always updated.
-            path_from_beginning_to_current_node = []
+            # Dictionary of paths.
+            path_from_source_to = {B_hashable_game_state([brane_dicts[chosen_brane],[]]): ""}
                 
             # Begin our search at the very beginning, holding nothing.
             nodes_to_check = set([])
@@ -2124,18 +2127,22 @@ while True:
                 bfs += 1
                 print("BFS iteration",bfs)
                 
-                if combo_name() in known_solutions and bfs+1 > len(known_solutions[combo_name()]):
+                if combo_name() in known_solutions and bfs > len(known_solutions[combo_name()]):
                     raise "BFS exceeds known solution length. Something went very wrong. Deleting cache is recommended."
                 
+                # Pickle cache and save a human-readable format.
                 pickle.dump(movement_state_dictionary, open(pickle_name(), 'wb'))
                 with open(pickle_name().replace(".pkl",".hrf"), "w", encoding="utf-8") as f:
                     f.write(str(movement_state_dictionary).replace("]'], '[[","]'],\n\n'[["))
                     
-                nodes_to_check = set(next_nodes_to_check)
-                nodes_to_check = nodes_to_check - visited_nodes
+                # Create the checklist for upcoming loop.
+                nodes_to_check = next_nodes_to_check - visited_nodes
                 next_nodes_to_check.clear()
                 
-                print(nodes_to_check)
+                # Debug.
+                for x in nodes_to_check:
+                    print(display_brane(B_brane_state_from_hasabled_node(x)))
+                    print("\n")
                 
                 # Iterate through each node.
                 for node in nodes_to_check: 
@@ -2148,26 +2155,34 @@ while True:
                     
                     # Check to see if this node is solved.
                     if is_brand_carved(B_brane_state_from_hasabled_node(node), brand_dicts[chosen_brand]):
-                        # Do something
+                        # Report it.
                         while True:
+                            print(display_brane(B_brane_state_from_hasabled_node(node)))
                             print("WE DID IT WE DID IT")
-                            print("no path available haven't coded it yet WEH")
+                            print(path_from_source_to[node])
                             notice = input("")
                     
                     # Establish cache value if needed.
                     if node not in movement_state_dictionary:
                         unhashed_node = B_unhashablize_node(node)
                         
+                        import copy
                         movement_state_dictionary[node] = [
-                            B_hashable_game_state(brane_walk(list(unhashed_node), "D", True)),
-                            B_hashable_game_state(brane_walk(list(unhashed_node), "L", True)),
-                            B_hashable_game_state(brane_walk(list(unhashed_node), "U", True)),
-                            B_hashable_game_state(brane_walk(list(unhashed_node), "R", True)),
-                            B_hashable_game_state(brane_walk(list(unhashed_node), "Z", True)),
+                            B_hashable_game_state(brane_walk(copy.deepcopy(unhashed_node), "D", True)),
+                            B_hashable_game_state(brane_walk(copy.deepcopy(unhashed_node), "L", True)),
+                            B_hashable_game_state(brane_walk(copy.deepcopy(unhashed_node), "U", True)),
+                            B_hashable_game_state(brane_walk(copy.deepcopy(unhashed_node), "R", True)),
+                            B_hashable_game_state(brane_walk(copy.deepcopy(unhashed_node), "Z", True)),
                         ]
-                        
                     elif len(movement_state_dictionary[node]) != 5:
                         raise ValueError("Cache contains stupid non-5 array.")
+                        
+                    # Establish paths.
+                    for i in range(5):
+                        if movement_state_dictionary[node][i] in path_from_source_to:
+                            continue
+                        
+                        path_from_source_to[movement_state_dictionary[node][i]] = path_from_source_to[node] + ["D","L","U","R","Z"][i]
                         
                     # Add neighbors to set.
                     for x in movement_state_dictionary[node]:
