@@ -2107,12 +2107,24 @@ while True:
             except EOFError:
                 pass
             except:
-                raise "Who knows?"
+                movement_state_dictionary = pickle.load(open(pickle_name(), 'rb'))
                 
             ## A node is defined as a "game state", a tuple containing first the brane state, then the held tiles. Together, these uniquely define a game position. (The changed applied by the wings, sword, and void rod are situational and handled separately.)
             
             # Keep a set of all visited nodes. If we ever re-visit them, we ignore it.
             visited_nodes = set([])
+            
+            def vn_pickle_name():
+                return pickle_name().replace(".pkl","").replace("game_state","visited_nodes")+"_"+combo_name()+".pkl"
+            
+            try:
+                visited_nodes = pickle.load(open(vn_pickle_name(), 'rb'))
+            except FileNotFoundError:
+                pass
+            except EOFError:
+                pass
+            except:
+                visited_nodes = pickle.load(open(vn_pickle_name(), 'rb'))
             
             # Dictionary of paths.
             path_from_source_to = {B_hashable_game_state([brane_dicts[chosen_brane],[]]): ""}
@@ -2120,6 +2132,9 @@ while True:
             # Begin our search at the very beginning, holding nothing.
             nodes_to_check = set([])
             next_nodes_to_check = {B_hashable_game_state([brane_dicts[chosen_brane],[]])}
+            
+            import time
+            dfs_timestamp = time.time()
             
             bfs = -1
             print("Beginning breadth-first search.")
@@ -2141,8 +2156,7 @@ while True:
                 
                 # Debug.
                 for x in nodes_to_check:
-                    print(display_brane(B_brane_state_from_hasabled_node(x)))
-                    print("\n")
+                    print(display_brane(B_brane_state_from_hasabled_node(x)),"\n",bfs)
                 
                 # Iterate through each node.
                 for node in nodes_to_check: 
@@ -2150,17 +2164,20 @@ while True:
                     if node in visited_nodes:
                         continue
                     
-                    # Establish having been here.
-                    visited_nodes.add(node)
-                    
                     # Check to see if this node is solved.
                     if is_brand_carved(B_brane_state_from_hasabled_node(node), brand_dicts[chosen_brand]):
                         # Report it.
                         while True:
                             print(display_brane(B_brane_state_from_hasabled_node(node)))
                             print("WE DID IT WE DID IT")
+                            print(combo_name_full())
+                            print("Took",time.time() - dfs_timestamp,"seconds to visit",len(visited_nodes),"nodes.")
                             print(path_from_source_to[node])
                             notice = input("")
+                   
+                    # Establish having been here.
+                    visited_nodes.add(node)
+                    pickle.dump(visited_nodes, open(vn_pickle_name(), 'wb'))
                     
                     # Establish cache value if needed.
                     if node not in movement_state_dictionary:
