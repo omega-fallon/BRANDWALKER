@@ -144,10 +144,10 @@ def get_mimic_value_from_tile(x: int):
     return x >> bits_per_variable
 ## Given a tile value, extracts the beaver value.
 def get_beaver_value_from_tile(x: int):
-    if get_entity_type_from_tile(x) != beaver_entity_type:
+    if get_entity_type_from_tile(x) != beaver_still_entity_type and get_entity_type_from_tile(x) != beaver_charge_entity_type:
         return 0
         
-    x -= base_value_2*beaver_entity_type
+    x -= base_value_2*get_entity_type_from_tile(x)
     return x >> bits_per_variable
 
 ## Given a tile value, extracts the player value.
@@ -368,7 +368,7 @@ def opposite_direction(x):
 ## Returns true if there any MOVING monsters in the brane. Because this is used to determine if turn-wasting is worthwhile, hands (hands!) are not counted.
 def here_be_moving_monsters_question(brane_state: list[int]):
     for i in range(36):
-        if get_entity_type_from_tile(brane_state[i]) == beaver_entity_type or get_entity_type_from_tile(brane_state[i]) == mimic_entity_type:
+        if get_entity_type_from_tile(brane_state[i]) == beaver_still_entity_type or get_entity_type_from_tile(brane_state[i]) == beaver_charge_entity_type or get_entity_type_from_tile(brane_state[i]) == mimic_entity_type:
             return True
 
     return False
@@ -376,7 +376,7 @@ def here_be_moving_monsters_question(brane_state: list[int]):
 ## Returns true if there any monsters in the brane, INCLUDING hands, hands!
 def here_be_monsters_question(brane_state: list[int]):
     for i in range(36):
-        if get_entity_type_from_tile(brane_state[i]) == beaver_entity_type or get_entity_type_from_tile(brane_state[i]) == mimic_entity_type or get_rock_value_from_tile(brane_state[i]) == hands_present_value:
+        if get_entity_type_from_tile(brane_state[i]) == beaver_still_entity_type or get_entity_type_from_tile(brane_state[i]) == beaver_charge_entity_type or get_entity_type_from_tile(brane_state[i]) == mimic_entity_type or get_rock_value_from_tile(brane_state[i]) == hands_present_value:
             return True
 
     return False
@@ -431,7 +431,7 @@ def stairs_exitable_question(brane_state: list[int]):
     for i in range(36):
         if get_land_value_from_tile(brane_state[i]) == button_value:
             # Button doesn't have a rock on it but does have a non-player entity on it.
-            if get_entity_type_from_tile(brane_state[i]) == beaver_entity_type or get_entity_type_from_tile(brane_state[i]) == mimic_entity_type:
+            if get_entity_type_from_tile(brane_state[i]) == beaver_still_entity_type or get_entity_type_from_tile(brane_state[i]) == beaver_charge_entity_type or get_entity_type_from_tile(brane_state[i]) == mimic_entity_type:
                 pass
             else:
                 return False
@@ -903,7 +903,7 @@ def all_watchers_triggered(brane_state: list[int]):
 def random_brane():
     # Choices to choose from
     valid_lands = [void_value, white_value, glass_value, chain_inactive_value, chain_active_value, button_value, exit_value]#, wall_value]
-    valid_entities = [0,player_entity_type, beaver_entity_type, mimic_entity_type, rock_entity_type]
+    valid_entities = [0,player_entity_type, beaver_still_entity_type, mimic_entity_type, rock_entity_type]
         
     # These will help eliminate configurations irrelevant to our purpose.
     add_whites = 18
@@ -995,8 +995,8 @@ def random_brane():
                 # Eliminations based on wall placement.
                 if land == wall_value:
                     # Bee
-                    if beaver_entity_type in valid_entities and (i == 0 or i == 5 or i == 35):
-                        valid_entities.remove(beaver_entity_type)
+                    if beaver_still_entity_type in valid_entities and (i == 0 or i == 5 or i == 35):
+                        valid_entities.remove(beaver_still_entity_type)
         else:
             land = random.choice(valid_lands)
             
@@ -1017,8 +1017,8 @@ def random_brane():
             if placed_whites > bee_whites:
                 if room_monster == "beaver":
                     raise ValueError("Random brane: beaver present but more whites than Bee's room.")
-                elif beaver_entity_type in valid_entities:
-                    valid_entities.remove(beaver_entity_type)
+                elif beaver_still_entity_type in valid_entities:
+                    valid_entities.remove(beaver_still_entity_type)
             # Excess whites means we can't be in Mon's room
             if placed_whites > mon_whites:
                 if placed_buttons > 0:
@@ -1067,15 +1067,15 @@ def random_brane():
                 valid_lands.remove(chain_active_value)
             
             # Glass is incompatible with beaver.
-            if beaver_entity_type in valid_entities:
-                valid_entities.remove(beaver_entity_type)
+            if beaver_still_entity_type in valid_entities:
+                valid_entities.remove(beaver_still_entity_type)
             
             # Excess glass means we can't be in Bee's room
             if placed_glass > bee_glass:
                 if room_monster == "beaver":
                     raise ValueError("Random brane: beaver present but more glass than Bee's room.")
-                elif beaver_entity_type in valid_entities:
-                    valid_entities.remove(beaver_entity_type)
+                elif beaver_still_entity_type in valid_entities:
+                    valid_entities.remove(beaver_still_entity_type)
             # Excess glass means we can't be in Mon's room
             if placed_glass > mon_glass:
                 if placed_buttons > 0:
@@ -1106,8 +1106,8 @@ def random_brane():
                 valid_lands.remove(button_value)
             
             # Chains are incompatible with beavers and mimics.
-            if beaver_entity_type in valid_entities:
-                valid_entities.remove(beaver_entity_type)
+            if beaver_still_entity_type in valid_entities:
+                valid_entities.remove(beaver_still_entity_type)
             if mimic_entity_type in valid_entities:
                 valid_entities.remove(mimic_entity_type)
             
@@ -1133,8 +1133,8 @@ def random_brane():
                 valid_lands.remove(chain_active_value)
             
             # Buttons are incompatible with mimics and beavers
-            if beaver_entity_type in valid_entities:
-                valid_entities.remove(beaver_entity_type)
+            if beaver_still_entity_type in valid_entities:
+                valid_entities.remove(beaver_still_entity_type)
             if mimic_entity_type in valid_entities:
                 valid_entities.remove(mimic_entity_type)
             
@@ -1175,12 +1175,12 @@ def random_brane():
             if entity_type == player_entity_type:
                 valid_entities.remove(player_entity_type)
             # Only one beaver allowed.
-            elif entity_type == beaver_entity_type:
+            elif entity_type == beaver_still_entity_type:
                 if room_monster != "":
                     raise ValueError("Random brane error: attempted to place mimic on brane with the following room_monster: "+room_monster)
                     
                 room_monster = "beaver"
-                valid_entities.remove(beaver_entity_type)
+                valid_entities.remove(beaver_still_entity_type)
                 
                 # Beaver and mimic are incompatible.
                 if mimic_entity_type in valid_entities:
@@ -1218,8 +1218,8 @@ def random_brane():
                 valid_entities.remove(mimic_entity_type)
                 
                 # Beaver and mimic are incompatible.
-                if beaver_entity_type in valid_entities:
-                    valid_entities.remove(beaver_entity_type)
+                if beaver_still_entity_type in valid_entities:
+                    valid_entities.remove(beaver_still_entity_type)
                 
                 # Chains are incompatible with mimics.
                 if placed_chains > 0:
@@ -1279,8 +1279,8 @@ def random_brane():
                 if button_value in valid_lands:
                     valid_lands.remove(button_value)
                 
-                if beaver_entity_type in valid_entities:
-                    valid_entities.remove(beaver_entity_type)
+                if beaver_still_entity_type in valid_entities:
+                    valid_entities.remove(beaver_still_entity_type)
                 if mimic_entity_type in valid_entities:
                     valid_entities.remove(mimic_entity_type)
                     
@@ -1349,7 +1349,7 @@ def brane_walk(game_state: list[list], input: str, state_space = False):
         faced_land_data = get_land_value_from_tile(full_faced_tile_data)
         
         # Slaaaaaayy the beaaast!!!
-        if sword and ((get_entity_type_from_tile(full_faced_tile_data) in [beaver_entity_type, mimic_entity_type]) or get_rock_value_from_tile(full_faced_tile_data) == hands_present_value):
+        if sword and ((get_entity_type_from_tile(full_faced_tile_data) in [beaver_still_entity_type, beaver_charge_entity_type, mimic_entity_type]) or get_rock_value_from_tile(full_faced_tile_data) == hands_present_value):
             game_state[0][index_tile_in_direction_of_player(game_state[0])] = create_tile_data(0,0,faced_land_data)
             game_state[0] = eliminate_monster_statues(game_state[0])
                 
@@ -1617,7 +1617,7 @@ hand_on_glass = create_tile_data(rock_entity_type, hands_present_value, glass_va
 rock_on_glass = create_tile_data(rock_entity_type, rock_present_value, glass_value)
 
 monster_statue_on_land = create_tile_data(rock_entity_type, monster_statue_value, white_value)
-watcher_on_land = create_tile_data(rock_entity_type, watcher_statue_value, white_value)
+watcher_on_land = create_tile_data(rock_entity_type, watcher_statue_inactive_value, white_value)
 
 brane_dicts = {
     "add": [
@@ -1641,7 +1641,7 @@ brane_dicts = {
         void_value, void_value, white_value, white_value, white_value, void_value,
         void_value, white_value, white_value, void_value, white_value, white_value,
         void_value, white_value, void_value, void_value, void_value, white_value,
-        void_value, create_tile_data(beaver_entity_type, 1, exit_value), void_value, player_down_solid, white_value, void_value,
+        void_value, create_tile_data(beaver_still_entity_type, 1, exit_value), void_value, player_down_solid, white_value, void_value,
         white_value, void_value, void_value, void_value, white_value, white_value,
         wall_value, white_value, white_value, white_value, white_value, void_value,
     ],
