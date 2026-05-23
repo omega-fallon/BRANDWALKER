@@ -894,7 +894,7 @@ def all_watchers_triggered(brane_state: list[int]):
     for i in range(36):
         if get_land_value_from_tile(brane_state[i]) == watcher_statue_inactive_value:
             return False
-        elif get_land_value_from_tile(brane_state[i]) == watcher_statue_active_value
+        elif get_land_value_from_tile(brane_state[i]) == watcher_statue_active_value:
             any_present = True
             
     return any_present
