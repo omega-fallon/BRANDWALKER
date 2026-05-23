@@ -1307,7 +1307,7 @@ def random_brane():
 
 #### State traversal function has a special spot right here. ####
 ## Directly modifies the input array. Account for this!!
-def brane_walk(game_state: list[list], input: str, state_space = False):
+def brane_walk(game_state: tuple[list], input: str, state_space = False):
     global death_flag, working_moves, steps_since_last_glass, steps_since_last_bump, steps_since_last_chain
     
     ## Validation.
@@ -1344,6 +1344,27 @@ def brane_walk(game_state: list[list], input: str, state_space = False):
     else:
         steps_since_last_chain += 1
     
+    # Beaver sees player.
+    if chosen_brane == "bee":
+        for i in range(36):
+            # Found inactive beaver.
+            if get_entity_type_from_tile(game_state[0][i]) == beaver_still_entity_type:
+                # Beaver is in LoS of player.
+                if player_entity_type in collumn_values(game_state[0], get_collumn(i)) or player_entity_type in row_values(game_state[0], row_collumn(i)):
+                    # Set beaver facing and in charge state; makes actual movement after player.
+                    if i - player_index >= 6: # charge up.
+                        game_state[0][i] = create_tile_data(beaver_charge_entity_type, 3, get_land_value_from_tile(game_state[0][i]))
+                    elif player_index - i >= 6: # charge down.
+                        game_state[0][i] = create_tile_data(beaver_charge_entity_type, 1, get_land_value_from_tile(game_state[0][i]))
+                    elif player_index > i: # charge right
+                        game_state[0][i] = create_tile_data(beaver_charge_entity_type, 4, get_land_value_from_tile(game_state[0][i]))
+                    elif player_index < i: # charge left
+                        game_state[0][i] = create_tile_data(beaver_charge_entity_type, 2, get_land_value_from_tile(game_state[0][i]))
+    
+                # There is only one beaver. In case of scope creep, disable.
+                break
+    
+    # Player action.
     if input == "Z":
         full_faced_tile_data = tile_in_direction_of_player(game_state[0])
         faced_land_data = get_land_value_from_tile(full_faced_tile_data)
@@ -1602,7 +1623,19 @@ def brane_walk(game_state: list[list], input: str, state_space = False):
     else:
         raise ValueError("Error! Cannot resolve world state!3 " + input)
         return "???"
-        
+      
+    # Monster turn!
+    if chosen_brane == "bee":
+        for i in range(36):
+            # Charging beaver found.
+            if get_entity_type_from_tile(game_state[0][i]) == beaver_charge_entity_type:
+                # Charging down
+                # Charging left
+                # Charging up
+                # Charging right
+                ## fill in!
+                pass
+      
     return game_state
 
 ## The dictionaries! ##
@@ -1957,6 +1990,8 @@ while True:
                 else:
                     return "swordless_wingless_finite"
         
+    from os import makedirs
+    makedirs("movement_dicts/"+pickle_name_sub()+"/"+combo_name()+"/", exist_ok = True)
     def gs_pickle_name():
         return "movement_dicts/"+pickle_name_sub()+"/"+combo_name()+"/game_state.pkl"
     def vn_pickle_name():
@@ -2049,7 +2084,7 @@ while True:
         if breadth_first_state_space_search:
             ## Specific functions.
             # Given a brane state, converts to a hashable (dictionary key–valid) form
-            def A_hashable_game_state(game_state: list[list]):
+            def A_hashable_game_state(game_state: tuple[list]):
                 # New rules!
                 if type(game_state) is int:
                     raise ValueError("hashable_game_state passed an already hashabled game state")
@@ -2136,7 +2171,7 @@ while True:
             
             ## Try another way. ##
             import json
-            def B_hashable_game_state(game_state: list[list]):
+            def B_hashable_game_state(game_state: tuple[list]):
                 # New rules!
                 if type(game_state) is int:
                     raise ValueError("hashable_game_state passed an already hashabled game state")
@@ -2163,21 +2198,23 @@ while True:
                     
                 return json.loads(node)
                 
-            # Returns true if for the given state and brand, there is ABSOLUTELY no way to recover. In this case we do not even check the node or its descendants. This has the potential to shave exponential amounts of nodes, so the more scenarios this can detect, the better.
-            def unrecoverable_branch(game_state: list[list], brand: list[int]):
+            # Returns true if for the given state, there is ABSOLUTELY no way to recover. In this case we do not even check the node or its descendants. This has the potential to shave exponential amounts of nodes, so the more scenarios this can detect, the better.
+            valids_in_brand = count_valids_in_brane(brand_dicts[chosen_brand])
+            def unrecoverable_branch(game_state: tuple[list]):
                 # Less tiles than needed.
-                if count_valids_in_brane(game_state[0]) + count_valids_gen(game_state[1]) < count_valids_in_brane(brand):
+                if count_valids_in_brane(game_state[0]) + count_valids_gen(game_state[1]) < valids_in_brand:
                     return True
                     
                 # Block where there shouldn't be. Only check in situations where it's possible to softlock.
                 if chosen_brane == "mon" or chosen_brane == "gor" or chosen_brane == "lev":
-                    for i in range(36):
+                    for i in (0,5,30,35):
                         if game_state[0][i] == wall_value and brand_dicts[chosen_brand][i] == void_value:
                             return True
                     
                 # Default
                 return False
             
+            ## Functions end. ##
             # Attempt to load our pickled dictionary.
             import pickle
             try:
@@ -2205,7 +2242,7 @@ while True:
                 visited_nodes = pickle.load(open(vn_pickle_name(), 'rb'))
             
             # Dictionary of paths.
-            path_from_source_to = {B_hashable_game_state([brane_dicts[chosen_brane],[]]): ""}
+            path_from_source_to = {B_hashable_game_state((brane_dicts[chosen_brane],[])): ""}
                 
             # Load cache.
             try:
@@ -2219,7 +2256,7 @@ while True:
                 
             # Begin our search at the very beginning, holding nothing.
             nodes_to_check = set([])
-            next_nodes_to_check = {B_hashable_game_state([brane_dicts[chosen_brane],[]])}
+            next_nodes_to_check = {B_hashable_game_state((brane_dicts[chosen_brane],[]))}
             
             # Load cache.
             try:
@@ -2244,43 +2281,45 @@ while True:
                 if combo_name() in known_solutions_burdenless and bfs > len(known_solutions_burdenless[combo_name()]):
                     raise "BFS exceeds known solution length. Something went very wrong. Deleting cache is recommended."
                 
-                # Pickle cache and save a human-readable format.
+                # Pickle cache.
                 pickle.dump(movement_state_dictionary, open(gs_pickle_name(), 'wb'))
-                #with open(gs_pickle_name().replace(".pkl",".hrf"), "w", encoding="utf-8") as f:
-                #    f.write(str(movement_state_dictionary).replace("]'], '[[","]'],\n\n'[["))
                     
                 # Create the checklist for upcoming loop.
                 nodes_to_check = next_nodes_to_check - visited_nodes
                 next_nodes_to_check.clear()
                 
                 # Stash in case of crash.
+                pickle.dump(visited_nodes, open(vn_pickle_name(), 'wb'))
                 pickle.dump(nodes_to_check, open(nntc_pickle_name(), 'wb'))
+                pickle.dump(path_from_source_to, open(pfst_pickle_name(), 'wb'))
                 
                 counter = -1
                 # Iterate through each node.
-                for node in nodes_to_check: 
-                    # Every-so-often saving.
-                    counter += 1
-                    if counter % 100 == 0:
-                        print("Ticking...",counter)
-                        pickle.dump(movement_state_dictionary, open(gs_pickle_name(), 'wb'))
-                    
+                for node in nodes_to_check:
                     # Debug
+                    counter += 1
                     print(display_brane(B_brane_state_from_hasabled_node(node)),"\n","Layer",bfs,"\n",counter,"/",len(nodes_to_check))
+                    
+                    while True:
+                        print(node)
                     
                     # Check if we've been here before. If so, no need to recalculate.
                     if node in visited_nodes:
                         continue
                     
+                    # Easier check to do, if possible.
+                    if not endless and not node.endswith("["+str(exit_value)+"]]"):
+                        pass
                     # Check to see if this node is solved.
-                    if is_brand_carved(B_brane_state_from_hasabled_node(node), brand_dicts[chosen_brand]):
+                    elif is_brand_carved(B_unhashablize_node(node), brand_dicts[chosen_brand]):
                         # Report it.
+                        time_at_success = time.time()
                         while True:
                             print(display_brane(B_brane_state_from_hasabled_node(node)))
                             print("WE DID IT WE DID IT")
                             print(combo_name_full())
-                            print("Took",time.time() - dfs_timestamp,"seconds to visit",len(visited_nodes),"nodes.")
-                            print("Average time-per-node:",(time.time() - dfs_timestamp)/len(visited_nodes))
+                            print("Took",time_at_success - dfs_timestamp,"seconds to visit",len(visited_nodes),"nodes.")
+                            print("Average time-per-node:",(time_at_success - dfs_timestamp)/len(visited_nodes))
                             print(path_from_source_to[node])
                             notice = input("")
                     
@@ -2288,14 +2327,16 @@ while True:
                     if node not in movement_state_dictionary:
                         unhashed_node = B_unhashablize_node(node)
                         
-                        import copy
+                        from copy import deepcopy
                         movement_state_dictionary[node] = [
-                            B_hashable_game_state(brane_walk(copy.deepcopy(unhashed_node), "D", True)),
-                            B_hashable_game_state(brane_walk(copy.deepcopy(unhashed_node), "L", True)),
-                            B_hashable_game_state(brane_walk(copy.deepcopy(unhashed_node), "U", True)),
-                            B_hashable_game_state(brane_walk(copy.deepcopy(unhashed_node), "R", True)),
-                            B_hashable_game_state(brane_walk(copy.deepcopy(unhashed_node), "Z", True)),
+                            B_hashable_game_state(brane_walk(deepcopy(unhashed_node), "D", True)),
+                            B_hashable_game_state(brane_walk(deepcopy(unhashed_node), "L", True)),
+                            B_hashable_game_state(brane_walk(deepcopy(unhashed_node), "U", True)),
+                            B_hashable_game_state(brane_walk(deepcopy(unhashed_node), "R", True)),
+                            B_hashable_game_state(brane_walk(deepcopy(unhashed_node), "Z", True)),
                         ]
+                        
+                        pickle.dump(movement_state_dictionary, open(gs_pickle_name(), 'wb'))
                     elif len(movement_state_dictionary[node]) != 5:
                         raise ValueError("Cache contains stupid non-5 array.")
                         
@@ -2312,15 +2353,19 @@ while True:
                             raise ValueError("Cache contains ???!")
                         elif unrecoverable_branch(B_unhashablize_node(x), brand_dicts[chosen_brand]):
                             pass
-                        elif x not in visited_nodes:
+                        else:
                             next_nodes_to_check.add(x)
                     
                     # Establish having been here.
                     visited_nodes.add(node)
-                    pickle.dump(visited_nodes, open(vn_pickle_name(), 'wb'))
-                    pickle.dump(nodes_to_check | next_nodes_to_check, open(nntc_pickle_name(), 'wb'))
-                    pickle.dump(path_from_source_to, open(pfst_pickle_name(), 'wb'))
+                    
+                    # Periodically stash in cash of crash. Don't do this too often or else it will slow shit way down.
+                    if counter % 1000 == 0:
+                        pickle.dump(visited_nodes, open(vn_pickle_name(), 'wb'))
+                        pickle.dump(nodes_to_check | next_nodes_to_check, open(nntc_pickle_name(), 'wb'))
+                        pickle.dump(path_from_source_to, open(pfst_pickle_name(), 'wb'))
         
+            # No success found.
             while True:
                 if combo_name() in known_solutions_burdenless:
                     print("Combination exists in known solutions. This is wrong.")
