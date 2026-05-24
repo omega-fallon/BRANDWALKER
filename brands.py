@@ -24,12 +24,15 @@ except:
     stupid_display_crap = True
 
 ## Prints a brand in a readable way.
-def display_brane(brane: list[int]):
-    if len(brane) != 36:
+def display_brane(brane: list[int], ignore_length: bool = False):
+    if len(brane) == 2:
+        raise ValueError("why the fuck is a game state here:",brane)
+    
+    if not ignore_length and len(brane) != 36:
         raise ValueError("Error! Brane with invalid length: " + str(len(brane)))
 
     string = ""
-    for i in range(36):
+    for i in range(len(brane)):
         string_to_add = "?"
         
         if brane[i] == void_value:
@@ -169,15 +172,15 @@ def get_land_value_from_tile(x: int):
 ## Given a brane state and a brand, returns true if the brand is currently successfully carved.
 def is_brand_carved(brane_state: list[int], brand: list[int]):
     if len(brane_state) != 36:
-        raise ValueError("brane_state is not 36 tiles large")
+        raise ValueError("brane_state is not 36 tiles large\n" + display_brane(brane_state, True))
 
     for i in range(36):
         ## First, validate the inputs to avoid any dumb mistakes.
         if brane_state[i] < 0 or brane_state[i] > create_tile_data(base_value-1, base_value-1, base_value-1):
-            raise ValueError("Error! Invalid brane_state input in is_brand_carved()! " + display_brane(brane_state))
+            raise ValueError("Error! Invalid brane_state input in is_brand_carved()!\n" + display_brane(brane_state))
 
         if brand[i] != 0 and brand[i] != 1:
-            raise ValueError("Error! Invalid brand input in is_brand_carved! " + str(brand))
+            raise ValueError("Error! Invalid brand input in is_brand_carved!\n" + display_brane(brand))
         
         ## Now, check in earnest.
         i_brane_state_land = get_land_value_from_tile(brane_state[i])
@@ -851,7 +854,12 @@ def safe_choice_list(brane_state: list[int], stupid_flaggot: bool = False):
     
     ## PREDESTINATION MODE ##
     if not stupid_flaggot and predestination_mode:
-        predestined_choice = known_solutions_burdenless[combo_name()][len(working_moves)]
+        if burdenless():
+            predestined_choice = known_solutions_burdenless[combo_name()][len(working_moves)]
+        elif only_wings():
+            predestined_choice = known_solutions_wings[combo_name()][len(working_moves)]
+        else:
+            raise ValueError("Couldn't find predestination.")
         
         if predestined_choice not in choices:
             print("Choices would've been: "+str(stupid_horse))
@@ -1328,21 +1336,22 @@ def brane_walk(game_state: tuple[list], input: str, state_space = False):
         try:
             player_index = get_player_index(game_state[0])
         except:
-            return game_state
+            return "self"
     else:
         player_index = get_player_index(game_state[0])
     player_land_data = get_land_value_from_tile(game_state[0][player_index])
     
     ## Update glass & chain counter.
-    if (player_land_data == glass_value):
-        steps_since_last_glass = 0
-    else:
-        steps_since_last_glass += 1
-        
-    if (player_land_data == chain_inactive_value or player_land_data == chain_active_value):
-        steps_since_last_chain = 0
-    else:
-        steps_since_last_chain += 1
+    if not state_space:
+        if (player_land_data == glass_value):
+            steps_since_last_glass = 0
+        else:
+            steps_since_last_glass += 1
+            
+        if (player_land_data == chain_inactive_value or player_land_data == chain_active_value):
+            steps_since_last_chain = 0
+        else:
+            steps_since_last_chain += 1
     
     # Beaver sees player.
     if chosen_brane == "bee":
@@ -1381,7 +1390,7 @@ def brane_walk(game_state: tuple[list], input: str, state_space = False):
                 death_flag = True
             
             if state_space:
-                return game_state
+                return "self"
             else:
                 working_moves = working_moves[:-1]
         # Tile is valid for pickup.
@@ -1395,14 +1404,15 @@ def brane_walk(game_state: tuple[list], input: str, state_space = False):
             game_state[0][index_tile_in_direction_of_player(game_state[0])] = 0
             
             # Bump watcher statues.
-            trigger_one_watcher(game_state[0])
-            if all_watchers_triggered(game_state[0]):
-                if not state_space:
-                    print("Error! Death by watcher??")
-                    death_flag = True
-                    
-                game_state[0][player_index] = create_tile_data(0,0,player_land_data)
-                return game_state
+            if not state_space or chosen_brane == "lev":
+                trigger_one_watcher(game_state[0])
+                if all_watchers_triggered(game_state[0]):
+                    if not state_space:
+                        print("Error! Death by watcher??")
+                        death_flag = True
+                        
+                    game_state[0][player_index] = create_tile_data(0,0,player_land_data)
+                    return game_state
         # Placing tile.
         elif full_faced_tile_data == void_value and len(game_state[1]) > 0:
             steps_since_last_bump += 1
@@ -1414,22 +1424,25 @@ def brane_walk(game_state: tuple[list], input: str, state_space = False):
             game_state[1].pop()
             
             # Bump watcher statues.
-            trigger_one_watcher(game_state[0])
-            if all_watchers_triggered(game_state[0]):
-                if not state_space:
-                    print("Error! Death by watcher??")
-                    death_flag = True
-                    
-                game_state[0][player_index] = create_tile_data(0,0,player_land_data)
-                return game_state
+            if not state_space or chosen_brane == "lev":
+                trigger_one_watcher(game_state[0])
+                if all_watchers_triggered(game_state[0]):
+                    if not state_space:
+                        print("Error! Death by watcher??")
+                        death_flag = True
+                        
+                    game_state[0][player_index] = create_tile_data(0,0,player_land_data)
+                    return game_state
         # Cannot do anything.
         else:
             if not state_space and safe_choices == ["Z"]:
                 print("Only valid move is Z but Z does nothing. Resetting...")
                 death_flag = True
-            return game_state
             
-            working_moves = working_moves[:-1]
+            if state_space:
+                return "self"
+            else:
+                working_moves = working_moves[:-1]
     elif (input == "D" or input == "L" or input == "U" or input == "R"):
         moving_tile_index = index_tile_in_direction_of_player(game_state[0], direction_letter_to_number(input))
 
@@ -1445,7 +1458,7 @@ def brane_walk(game_state: tuple[list], input: str, state_space = False):
             if not state_space:
                 print("Error! Death by hand?? Hands?!!")
                 death_flag = True
-            return game_state
+            return "self"
         # Moving into a rock or statue.
         elif get_rock_value_from_tile(full_moving_tile_data) != 0:
             steps_since_last_bump = 0
@@ -1603,7 +1616,7 @@ def brane_walk(game_state: tuple[list], input: str, state_space = False):
                 if not state_space:
                     print("Error! Death by stairs??")
                     death_flag = True
-                return game_state
+                return "self"
             # Tile is a wall. This is basically the same as solid tile except we only change the facing direction.
             elif moving_land_data == wall_value:
                 steps_since_last_bump = 0
@@ -1617,6 +1630,10 @@ def brane_walk(game_state: tuple[list], input: str, state_space = False):
                     return game_state
                 else:
                     game_state[0][player_index] = create_tile_data(1, direction_letter_to_number(input), player_land_data)
+                    
+                    # Simply changing your direction to face directly into a wall is never useful unless you're wasting a turn. If there are no moving monsters, wasting turns is pointless. Therefore we can eleminate these from the state space graph.
+                    if chosen_brane == "add" or chosen_brane == "eus" or chosen_brane == "mon" or chosen_brane == "tan" or chosen_brane == "lev" or chosen_brane == "cif" or not here_be_moving_monsters_question(game_state[0]):
+                        return "fe"
             else:
                 raise ValueError("Error! Cannot resolve world state!2 " + input + " " + str(moving_land_data))
                 return "???"
@@ -1842,7 +1859,6 @@ known_solutions_burdenless = {
     "eus+eus": "LZRURDRLLRZRZLLRZRDLZDZDZLDR",
     "eus+lev": "LZURRDLZLRZDDUUDZDDZURUZLDUZDZDLZRZULZRUZDZULRZRRZLLRZRLZUDZDRZLUZDDZRU",
     "eus+cif": "LZRRLZDLZRRLZUUDZRUDZDZUZRLZDZRZLZDUZDZDZRRUZLLUDZUZUZDDLRZUUDZUZURLDDUZDZDUZDZDLZRUUZDDUZDZDLRZUUZDZURLZLLRZURZRZ",
-    # Sum[Divide[\(40)35+1\(41)!,\(40)\(40)2+b\(41)! * 3! * \(40)30-b\(41)! * 1!\(41)]* \(40)3+30-b\(41) * 4,{b,0,33-15}]
     
     "mon+eus": "UUZLDDUZUZLRZRRZLLDZDDDRRZLUULUURLZLZDLDDRDRRRZLZRRUUULZLZDZDZUUULLUDZRRDZULLDLRZRZLDZLURZUDZDUZ",
     
@@ -1853,7 +1869,25 @@ known_solutions_burdenless = {
 
 # Only when shorter.
 known_solutions_wings = {
+    "eus+add": "DLLDDRDRZRRURULUULLDLZRURRLZLRZRZDZUZUDZLLDLZRURRZLLRZLDLZLDUZUDZRRLZRURZLZDLDZURURZLZDLUZDZRUZLUDZRRLZRZUDRZ",
+    "eus+bee": "ULLDRZRRDDZDZDRLULULRUUZRRZLDZDZLUZRZUDZURULZL",
+    "eus+tan": "LLRZUDDRDDLRZDURZRLZULUURZRLZRZUDDLDDUZDZ",
+}
+
+known_solutions_sword = {
+    #"tan+tan"
+}
+
+# Massive numbers.
+total_valid_states = {
+    "add": 24176160439200,
     
+    "eus+add": 57966387913415520,
+    "eus+eus": 17611148862457920,
+    "eus+bee": 57966387913415520,
+    "eus+tan": 17611148862457920,
+    "eus+cif": 75652607679153120,
+    "eus+trailer": 76869298484082720,
 }
 
 ## ## ## ## ## ##
@@ -1922,6 +1956,9 @@ while True:
     if chosen_brane == "brane":
         random_brane_generation = True
         continue
+    if chosen_brane == "bf":
+        breadth_first_state_space_search = not breadth_first_state_space_search
+        continue
         
     chosen_brand = input("...And the brand?\n")
     chosen_brand = chosen_brand.lower()
@@ -1955,7 +1992,11 @@ while True:
         continue
     
     # Resets this as irrelevant.
-    if predestination_mode and not (combo_name() in known_solutions_burdenless):
+    def burdenless():
+        return not wings and not sword and not endless
+    def only_wings():
+        return wings and not sword and not endless
+    if predestination_mode and not (burdenless() and combo_name() in known_solutions_burdenless) and not (only_wings() and combo_name() in known_solutions_wings):
         print("Brane/brand combination not in solution list, disabling predestination mode.")
         predestination_mode = False
     
@@ -2000,6 +2041,8 @@ while True:
         return "movement_dicts/"+pickle_name_sub()+"/"+combo_name()+"/next_nodes_to_check.pkl"
     def pfst_pickle_name():
         return "movement_dicts/"+pickle_name_sub()+"/"+combo_name()+"/path_from_source_to.pkl"
+    def bfs_pickle_name():
+        return "movement_dicts/"+pickle_name_sub()+"/"+combo_name()+"/search_counter.pkl"
     
     # For testing/bulking up the cache.
     if random_brane_generation:
@@ -2051,12 +2094,16 @@ while True:
                 # Read and filter
                 for i in range(len(lines)):
                     if i % 2 == 0:
-                        if combo_name() in known_solutions_burdenless and known_solutions_burdenless[combo_name()].startswith(lines[i].strip()):
+                        if burdenless() and combo_name() in known_solutions_burdenless and known_solutions_burdenless[combo_name()].startswith(lines[i].strip()):
+                            pass
+                        elif only_wings() and combo_name() in known_solutions_wings and known_solutions_wings[combo_name()].startswith(lines[i].strip()):
                             pass
                         else:
                             bad_solutions.append(lines[i].strip())
                     else:
-                        if combo_name() in known_solutions_burdenless and known_solutions_burdenless[combo_name()].startswith(lines[i-1].strip()):
+                        if burdenless() and combo_name() in known_solutions_burdenless and known_solutions_burdenless[combo_name()].startswith(lines[i-1].strip()):
+                            pass
+                        elif only_wings() and combo_name() in known_solutions_wings and known_solutions_wings[combo_name()].startswith(lines[i-1].strip()):
                             pass
                         else:
                             bad_solutions_distance.append(int(lines[i].strip()))
@@ -2173,7 +2220,10 @@ while True:
             import json
             def B_hashable_game_state(game_state: tuple[list]):
                 # New rules!
-                if type(game_state) is int:
+                if game_state == "self" or game_state == "fe":
+                    return game_state
+                
+                if type(game_state) is int or type(game_state) is str:
                     raise ValueError("hashable_game_state passed an already hashabled game state")
                 
                 if len(game_state) != 2 or type(game_state[0]) is not list or type(game_state[1]) is not list:
@@ -2198,15 +2248,21 @@ while True:
                     
                 return json.loads(node)
                 
+            # Returns True if the player is standing on glass.
+            def standing_on_glass(brane_state: list[int]):
+                return get_land_value_from_tile(brane_state[get_player_index(brane_state)]) == glass_value
+                
             # Returns true if for the given state, there is ABSOLUTELY no way to recover. In this case we do not even check the node or its descendants. This has the potential to shave exponential amounts of nodes, so the more scenarios this can detect, the better.
             valids_in_brand = count_valids_in_brane(brand_dicts[chosen_brand])
+            any_glass = chosen_brane == "eus" or chosen_brane == "mon"  or chosen_brane == "gor"
+            blockable_branes = chosen_brane == "mon" or chosen_brane == "gor" or chosen_brane == "lev"
             def unrecoverable_branch(game_state: tuple[list]):
                 # Less tiles than needed.
-                if count_valids_in_brane(game_state[0]) + count_valids_gen(game_state[1]) < valids_in_brand:
+                if count_valids_in_brane(game_state[0]) + count_valids_gen(game_state[1]) - int(any_glass and standing_on_glass(game_state[0])) < valids_in_brand:
                     return True
                     
                 # Block where there shouldn't be. Only check in situations where it's possible to softlock.
-                if chosen_brane == "mon" or chosen_brane == "gor" or chosen_brane == "lev":
+                if blockable_branes:
                     for i in (0,5,30,35):
                         if game_state[0][i] == wall_value and brand_dicts[chosen_brand][i] == void_value:
                             return True
@@ -2240,6 +2296,8 @@ while True:
                 pass
             except:
                 visited_nodes = pickle.load(open(vn_pickle_name(), 'rb'))
+                
+            len_visited_nodes_cache = len(visited_nodes)
             
             # Dictionary of paths.
             path_from_source_to = {B_hashable_game_state((brane_dicts[chosen_brane],[])): ""}
@@ -2272,14 +2330,30 @@ while True:
             import time
             dfs_timestamp = time.time()
             
+            # Movement-dictionary saving counter
+            md_counter = 0
+            
+            # BFS counter
             bfs = -1
+            try:
+                bfs = pickle.load(open(bfs_pickle_name(), 'rb'))
+            except FileNotFoundError:
+                pass
+            except EOFError:
+                pass
+            except:
+                bfs = pickle.load(open(bfs_pickle_name(), 'rb'))
             print("Beginning breadth-first search.")
             while len(next_nodes_to_check) > 0:
                 bfs += 1
                 print("BFS iteration",bfs)
+                pickle.dump(bfs, open(bfs_pickle_name(), 'wb'))
                 
+                # Even if we're not burdenless, ging longer than the burdenless solution can only mean we're doing something wrong.
                 if combo_name() in known_solutions_burdenless and bfs > len(known_solutions_burdenless[combo_name()]):
-                    raise "BFS exceeds known solution length. Something went very wrong. Deleting cache is recommended."
+                    raise "BFS exceeds known burdenless solution length. Something went very wrong. Deleting cache is recommended."
+                elif only_wings() and combo_name() in known_solutions_wings and bfs > len(known_solutions_wings[combo_name()]):
+                    raise "BFS exceeds known winged solution length. Something went very wrong. Deleting cache is recommended."
                 
                 # Pickle cache.
                 pickle.dump(movement_state_dictionary, open(gs_pickle_name(), 'wb'))
@@ -2298,28 +2372,30 @@ while True:
                 for node in nodes_to_check:
                     # Debug
                     counter += 1
-                    print(display_brane(B_brane_state_from_hasabled_node(node)),"\n","Layer",bfs,"\n",counter,"/",len(nodes_to_check))
+                    #print(display_brane(B_brane_state_from_hasabled_node(node)))
+                    print("Layer",bfs,"\n",counter,"/",len(nodes_to_check))
                     
-                    while True:
-                        print(node)
+                    #while True:
+                    #    print(node)
                     
                     # Check if we've been here before. If so, no need to recalculate.
-                    if node in visited_nodes:
-                        continue
+                    #if node in visited_nodes:
+                    #    print("Notice! This is a backup measure that shouldn't be getting triggered.")
+                    #    continue
                     
                     # Easier check to do, if possible.
                     if not endless and not node.endswith("["+str(exit_value)+"]]"):
                         pass
                     # Check to see if this node is solved.
-                    elif is_brand_carved(B_unhashablize_node(node), brand_dicts[chosen_brand]):
+                    elif is_brand_carved(B_brane_state_from_hasabled_node(node), brand_dicts[chosen_brand]):
                         # Report it.
                         time_at_success = time.time()
                         while True:
                             print(display_brane(B_brane_state_from_hasabled_node(node)))
                             print("WE DID IT WE DID IT")
                             print(combo_name_full())
-                            print("Took",time_at_success - dfs_timestamp,"seconds to visit",len(visited_nodes),"nodes.")
-                            print("Average time-per-node:",(time_at_success - dfs_timestamp)/len(visited_nodes))
+                            print("Took",time_at_success - dfs_timestamp,"seconds to visit",len(visited_nodes)-len_visited_nodes_cache,"nodes.")
+                            print("Average time-per-node:",(time_at_success - dfs_timestamp)/(len(visited_nodes)-len_visited_nodes_cache))
                             print(path_from_source_to[node])
                             notice = input("")
                     
@@ -2336,7 +2412,10 @@ while True:
                             B_hashable_game_state(brane_walk(deepcopy(unhashed_node), "Z", True)),
                         ]
                         
-                        pickle.dump(movement_state_dictionary, open(gs_pickle_name(), 'wb'))
+                        # Save our cache every so often.
+                        md_counter += 1
+                        if md_counter % 10000 == 0:
+                            pickle.dump(movement_state_dictionary, open(gs_pickle_name(), 'wb'))
                     elif len(movement_state_dictionary[node]) != 5:
                         raise ValueError("Cache contains stupid non-5 array.")
                         
@@ -2345,13 +2424,15 @@ while True:
                         if movement_state_dictionary[node][i] in path_from_source_to:
                             continue
                         
-                        path_from_source_to[movement_state_dictionary[node][i]] = path_from_source_to[node] + ["D","L","U","R","Z"][i]
+                        path_from_source_to[movement_state_dictionary[node][i]] = path_from_source_to[node] + ("D","L","U","R","Z")[i]
                         
                     # Add neighbors to set.
                     for x in movement_state_dictionary[node]:
                         if x == "???":
                             raise ValueError("Cache contains ???!")
-                        elif unrecoverable_branch(B_unhashablize_node(x), brand_dicts[chosen_brand]):
+                        elif x == "self" or x == "fe":
+                            pass
+                        elif unrecoverable_branch(B_unhashablize_node(x)):
                             pass
                         else:
                             next_nodes_to_check.add(x)
@@ -2360,7 +2441,7 @@ while True:
                     visited_nodes.add(node)
                     
                     # Periodically stash in cash of crash. Don't do this too often or else it will slow shit way down.
-                    if counter % 1000 == 0:
+                    if counter % 10000 == 0:
                         pickle.dump(visited_nodes, open(vn_pickle_name(), 'wb'))
                         pickle.dump(nodes_to_check | next_nodes_to_check, open(nntc_pickle_name(), 'wb'))
                         pickle.dump(path_from_source_to, open(pfst_pickle_name(), 'wb'))
@@ -2556,7 +2637,12 @@ while True:
                         print("Trimming complete without doing anything.")
                 
                 too_long = False
-                if combo_name() in known_solutions_burdenless and len(working_moves) > len(known_solutions_burdenless[combo_name()]):
+                if burdenless() and combo_name() in known_solutions_burdenless and len(working_moves) > len(known_solutions_burdenless[combo_name()]):
+                    print("Working moves too long. Resetting...")
+                    death_flag = True
+                    too_long = True
+                    break
+                elif only_wings() and combo_name() in known_solutions_wings and len(working_moves) > len(known_solutions_wings[combo_name()]):
                     print("Working moves too long. Resetting...")
                     death_flag = True
                     too_long = True
@@ -2670,7 +2756,7 @@ while True:
                 working_moves += current_move
 
                 ## Update the brane state.
-                brane_walk(current_brane_layout, current_move)
+                brane_walk((current_brane_layout, held_tiles), current_move)
                 if death_flag:
                     break
 
