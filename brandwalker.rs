@@ -711,7 +711,7 @@ fn here_be_monsters_question(brane_state: [u16; 36]) -> bool {
 const breakables : [u16; 3] = [glass_value, chain_inactive_value, chain_active_value];
 const fn brane_has_breakable_question(brane_state: [u16; 36]) -> bool {
     for i in 0..36 {
-        if breakables.contains(get_land_value_from_tile(brane_state[i])) {
+        if breakables.contains(&get_land_value_from_tile(brane_state[i])) {
             return true
         }
     }
@@ -764,7 +764,7 @@ const fn count_state_1s(brane_state: [u16; 36]) -> u16 {
 // Checks if the stairs are active (i.e., available to exit from)
 const fn stairs_exitable_question(brane_state: [u16; 36], held_tiles: Vec<u16>) -> bool {
     // Check the rod first.
-    if held_tiles.contains(exit_value) {
+    if held_tiles.contains(&exit_value) {
         return false
     }
 
@@ -807,15 +807,15 @@ fn count_valids_gen(input: Vec<u16>) -> u16 {
 }
     
 // Returns taxicab distance between two points on the brane room, given by their index.
-fn taxicadistance(a: u16, b: u16) -> u16 {
-    let x1 = a % 6;
-    let y1 = int(a/6);
-    
-    let x2 = b % 6;
-    let y2 = int(b/6);
-    
-    return abs(x1 - x2) + abs(y1 - y2);
-}
+//fn taxicadistance(a: u16, b: u16) -> u16 {
+//    let x1 = a % 6;
+//    let y1 = int(a/6);
+//    
+//    let x2 = b % 6;
+//    let y2 = int(b/6);
+//    
+//    return abs(x1 - x2) + abs(y1 - y2);
+//}
     
 // Returns true if player is floating.
 fn floating(brane_state: [u16; 36]) -> bool {
@@ -824,19 +824,19 @@ fn floating(brane_state: [u16; 36]) -> bool {
     
 // Given an i value for a brane array && movements on the x && y axis, returns a new i index corresponding to that movement.
 // Don't call correctly unless you're handling the 37 case.
-fn move_cartesian(i: u16, x: i16, y: i16) -> u16 {
-    let store = i + x + 6*y;
+fn move_cartesian(i: usize, x: i16, y: i16) -> usize {
+    let store = i as i16 + x + 6*y;
     
-    if store > 35 || store < 0 || trunc(i/6) != trunc((i+x)/6) {
+    if store > 35 || store < 0 || (i/6) as u16 != ((i as i16 + x)/6) as u16 {
         return 37;
     }
     else {
-        return u16(store);
+        return store as usize;
     }
 }
     
 // Given a starting position && cartesian movements, returns the full tile value of the tile at that index. Accounts for OOB searching.
-fn tile_at_moved_cartesian(i: u16, brane_state: [u16; 36], x: i16, y: i16) -> u16 {
+fn tile_at_moved_cartesian(i: usize, brane_state: [u16; 36], x: i16, y: i16) -> u16 {
     let store = move_cartesian(i, x, y);
     
     if store == 37 {
@@ -848,8 +848,8 @@ fn tile_at_moved_cartesian(i: u16, brane_state: [u16; 36], x: i16, y: i16) -> u1
 }
     
 // Given a starting position && cartesian movements, returns the land value of the tile at that index. Accounts for OOB searching.
-fn land_at_moved_cartesian(i: u16, brane_state: [u16; 36], x: i16, y: i16) -> u16 {
-    let store = move_cartesian(i, x, y);
+fn land_at_moved_cartesian(i: usize, brane_state: [u16; 36], x: i16, y: i16) -> u16 {
+    let store : usize = move_cartesian(i, x, y);
     
     if store == 37 {
         return wall_value;
@@ -865,12 +865,12 @@ fn effective_type_1(i: u16, brane_state: [u16; 36], held_tiles: Vec<u16>) -> boo
 }
     
 // Returns true if there is a 3 line of moveable land tiles. This includes only type-1 && inactive type-3.
-fn three_line_present_strict(brane_state: [u16; 36]) -> bool {
+fn three_line_present_strict(brane_state: [u16; 36], held_tiles: Vec<u16>) -> bool {
     for i in 0..36 {
-        if i + 3 <= 35 && int(i/6) == int((i+3)/6) && effective_type_1(brane_state[i],brane_state) && effective_type_1(brane_state[i+1],brane_state) && effective_type_1(brane_state[i+2],brane_state) {
+        if i + 3 <= 35 && (i/6) == ((i+3)/6) && effective_type_1(brane_state[i],brane_state,held_tiles) && effective_type_1(brane_state[i+1],brane_state,held_tiles) && effective_type_1(brane_state[i+2],brane_state,held_tiles) {
             return true
         }
-        if i + 6*2 <= 35 && effective_type_1(brane_state[i],brane_state) && effective_type_1(brane_state[i+6],brane_state) && effective_type_1(brane_state[i+12],brane_state) {
+        if i + 6*2 <= 35 && effective_type_1(brane_state[i],brane_state,held_tiles) && effective_type_1(brane_state[i+6],brane_state,held_tiles) && effective_type_1(brane_state[i+12],brane_state,held_tiles) {
             return true
         }
     }
@@ -893,28 +893,28 @@ fn trigger_chain_disperse(mut brane_state: [u16; 36], i: u16) -> [u16; 36] {
         for triggered_i in triggered_tiles {
             // Confirm land.
             if get_land_value_from_tile(brane_state[triggered_i]) != chain_active_value {
-                panic!("triggered_i isn't an active chain: {} {}",triggered_i,triggered_tiles)
+                panic!("triggered_i isn't an active chain: {} {:?}",triggered_i,triggered_tiles)
             }
                 
             // Check each direction.
-            if triggered_i-1 >= 0 && !triggered_tiles.contains(triggered_i-1) && get_land_value_from_tile(brane_state[triggered_i-1]) == chain_active_value {
+            if triggered_i-1 >= 0 && !triggered_tiles.contains(&(triggered_i-1)) && get_land_value_from_tile(brane_state[triggered_i-1]) == chain_active_value {
                 done_something = true;
-                triggered_tiles.add(triggered_i-1);
+                triggered_tiles.push(triggered_i-1);
                 break;
             }
-            if triggered_i+1 <= 35 && !triggered_tiles.contains(triggered_i+1) && get_land_value_from_tile(brane_state[triggered_i+1]) == chain_active_value {
+            if triggered_i+1 <= 35 && !triggered_tiles.contains(&(triggered_i+1)) && get_land_value_from_tile(brane_state[triggered_i+1]) == chain_active_value {
                 done_something = true;
-                triggered_tiles.add(triggered_i+1);
+                triggered_tiles.push(triggered_i+1);
                 break;
             }
-            if triggered_i-6 >= 0 && !triggered_tiles.contains(triggered_i-6) && get_land_value_from_tile(brane_state[triggered_i-6]) == chain_active_value {
+            if triggered_i-6 >= 0 && !triggered_tiles.contains(&(triggered_i-6)) && get_land_value_from_tile(brane_state[triggered_i-6]) == chain_active_value {
                 done_something = true;
-                triggered_tiles.add(triggered_i-6);
+                triggered_tiles.push(triggered_i-6);
                 break;
             }
-            if triggered_i+6 <= 35 && !triggered_tiles.contains(triggered_i+6) && get_land_value_from_tile(brane_state[triggered_i+6]) == chain_active_value {
+            if triggered_i+6 <= 35 && !triggered_tiles.contains(&(triggered_i+6)) && get_land_value_from_tile(brane_state[triggered_i+6]) == chain_active_value {
                 done_something = true;
-                triggered_tiles.add(triggered_i+6);
+                triggered_tiles.push(triggered_i+6);
                 break;
             }
         }
@@ -1080,32 +1080,33 @@ fn main() {
         let player_land_data = get_land_value_from_tile(game_state[0][player_index]);
         
         // Beaver sees player. (haven't coded excluding vision through walls, no need to)
-        if chosen_brane == "bee" {
-            for i in 0..36 {
-                // Found inactive beaver.
-                if get_entity_type_from_tile(game_state[0][i]) == beaver_still_entity_type {
-                    // Beaver is in LoS of player.
-                    if collumn_values(game_state[0], get_collumn(i)).contains(player_entity_type) || row_values(game_state[0], row_collumn(i)).contains(player_entity_type) {
-                        // Set beaver facing && in charge state; makes actual movement after player.
-                        if i - player_index >= 6 { // charge up.
-                            game_state[0][i] = create_tile_data(beaver_charge_entity_type, 3, get_land_value_from_tile(game_state[0][i]));
-                        }
-                        else if player_index - i >= 6 { // charge down.
-                            game_state[0][i] = create_tile_data(beaver_charge_entity_type, 1, get_land_value_from_tile(game_state[0][i]));
-                        }
-                        else if player_index > i { // charge right
-                            game_state[0][i] = create_tile_data(beaver_charge_entity_type, 4, get_land_value_from_tile(game_state[0][i]));
-                        }
-                        else if player_index < i { // charge left
-                            game_state[0][i] = create_tile_data(beaver_charge_entity_type, 2, get_land_value_from_tile(game_state[0][i]));
-                        }
-                    }
-                        
-                    // There is only one beaver. In case of scope creep, disable.
-                    break;
-                }
-            }
-        }
+        //if chosen_brane == "bee" {
+        //    for i in 0..36 {
+        //        // Found inactive beaver.
+        //        if get_entity_type_from_tile(game_state[0][i]) == beaver_still_entity_type {
+        //            // Beaver is in LoS of player.
+        //            if collumn_values(game_state[0], get_collumn(i)).contains(player_entity_type) || row_values(game_state[0], row_collumn(i)).contains(player_entity_type) {
+        //                // Set beaver facing && in charge state; makes actual movement after player.
+        //                if i - player_index >= 6 { // charge up.
+        //                    game_state[0][i] = create_tile_data(beaver_charge_entity_type, 3, get_land_value_from_tile(game_state[0][i]));
+        //                }
+        //                else if player_index - i >= 6 { // charge down.
+        //                    game_state[0][i] = create_tile_data(beaver_charge_entity_type, 1, get_land_value_from_tile(game_state[0][i]));
+        //                }
+        //                else if player_index > i { // charge right
+        //                    game_state[0][i] = create_tile_data(beaver_charge_entity_type, 4, get_land_value_from_tile(game_state[0][i]));
+        //                }
+        //                else if player_index < i { // charge left
+        //                    game_state[0][i] = create_tile_data(beaver_charge_entity_type, 2, get_land_value_from_tile(game_state[0][i]));
+        //                }
+        //            }
+        //                
+        //            // There is only one beaver. In case of scope creep, disable.
+        //            break;
+        //        }
+        //    }
+        //}
+        
         // Player action.
         if input == 'Z' {
             let full_faced_tile_data = tile_in_direction_of_player(game_state[0], 'X');
@@ -1625,12 +1626,12 @@ fn main() {
                     //pass
                 }
                 else {
-                    next_nodes_to_check.add(x);
+                    next_nodes_to_check.push(x);
                 }
             }
             
             // Establish having been here.
-            visited_nodes.add(node);
+            visited_nodes.push(node);
             
             // Periodically stash in cash of crash. Don't do this too often || else it will slow shit way down.
             if counter % 10000 == 0 {
